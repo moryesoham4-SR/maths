@@ -129,45 +129,132 @@ def solve_gcd(a: int, b: int):
     a, b = abs(int(a)), abs(int(b))
     x, y = a, b
     if y == 0:
-        return [("Edge case", f"gcd({x}, 0) = {x}")], str(x), {}
-    steps.append(("Set up", f"Apply the Euclidean Algorithm to gcd({x}, {y})."))
+        return [("Edge case", f"gcd({x}, 0) = {x} — by definition, gcd(n, 0) = n.")], str(x), {}
+
+    steps.append(("The principle", "The Euclidean Algorithm relies on the fact that "
+                  "gcd(x, y) = gcd(y, x mod y). We repeatedly replace the larger number "
+                  "with the remainder of dividing it by the smaller number, until the "
+                  "remainder becomes 0."))
+    steps.append(("Set up", f"We need gcd({x}, {y}). Since {x} > {y}, divide {x} by {y}."))
+
+    divisions = []
+    round_no = 1
     while y != 0:
         q = x // y
         r = x % y
-        steps.append((f"Divide", f"{x} = {q} × {y} + {r}"))
+        steps.append((f"Step {round_no}: Divide",
+                      f"{x} ÷ {y} = {q} remainder {r}\n"
+                      f"→ {x} = {q} × {y} + {r}"))
+        divisions.append((x, y, q, r))
+        if r == 0:
+            steps.append((f"Step {round_no}: Remainder check",
+                          f"Remainder is {r} — we stop here. The divisor at this step, {y}, "
+                          f"is the GCD."))
+        else:
+            steps.append((f"Step {round_no}: Continue",
+                          f"Remainder {r} ≠ 0, so repeat the process with gcd({y}, {r})."))
         x, y = y, r
-    steps.append(("Remainder is 0", f"Stop — the last non-zero remainder is the GCD."))
-    return steps, str(x), {"pairs": (a, b)}
+        round_no += 1
+
+    gcd_val = x
+    steps.append(("Verify", f"Check: {a} ÷ {gcd_val} = {a // gcd_val} (no remainder), "
+                  f"{b} ÷ {gcd_val} = {b // gcd_val} (no remainder) — confirms {gcd_val} "
+                  f"divides both numbers exactly."))
+    return steps, str(gcd_val), {"pairs": (a, b), "divisions": divisions}
 
 
 def solve_complex_to_polar(a: float, b: float):
     steps = []
-    steps.append(("Identify the form", f"z = {a} + {b}i is in rectangular (x + yi) form."))
-    r = math.sqrt(a**2 + b**2)
-    steps.append(("Find the modulus", f"r = √(x² + y²) = √({a}² + {b}²) = √{a**2 + b**2:g} = {r:.4f}"))
+    steps.append(("Identify the form", f"z = {a} + {b}i is in rectangular (x + yi) form, "
+                  f"where x = {a} (real part) and y = {b} (imaginary part)."))
+
+    steps.append(("Modulus formula", "The modulus (distance from origin) is given by "
+                  "r = √(x² + y²) — this comes directly from the Pythagorean theorem, "
+                  "treating (x, y) as a point in the Argand plane."))
+    x_sq, y_sq = a**2, b**2
+    steps.append(("Square each part", f"x² = ({a})² = {x_sq:g}\ny² = ({b})² = {y_sq:g}"))
+    sum_sq = x_sq + y_sq
+    steps.append(("Sum the squares", f"x² + y² = {x_sq:g} + {y_sq:g} = {sum_sq:g}"))
+    r = math.sqrt(sum_sq)
+    steps.append(("Take the square root", f"r = √{sum_sq:g} = {r:.4f}"))
+
+    quadrant = "1st (x>0, y>0)" if a > 0 and b >= 0 else \
+               "2nd (x<0, y>0)" if a < 0 and b >= 0 else \
+               "3rd (x<0, y<0)" if a < 0 and b < 0 else "4th (x>0, y<0)"
+    steps.append(("Locate the quadrant", f"With x = {a} and y = {b}, the point lies in the "
+                  f"{quadrant} quadrant — this tells us which range θ should fall in before "
+                  f"we trust the calculator's inverse-tan output."))
+
+    ref_angle = math.degrees(math.atan2(abs(b), abs(a))) if a != 0 else 90.0
+    steps.append(("Argument formula", "The argument (angle from positive real axis) is "
+                  "θ = tan⁻¹(y/x), adjusted for the correct quadrant."))
     theta = math.atan2(b, a)
     theta_deg = math.degrees(theta)
-    quadrant = "1st" if a > 0 and b >= 0 else "2nd" if a < 0 and b >= 0 else "3rd" if a < 0 and b < 0 else "4th"
-    steps.append(("Find the argument", f"θ = atan2(y, x) = {theta:.4f} rad ≈ {theta_deg:.2f}°  ({quadrant} quadrant)"))
-    steps.append(("Write in polar form", f"z = r(cosθ + i sinθ) = {r:.4f}(cos({theta_deg:.2f}°) + i·sin({theta_deg:.2f}°))"))
+    steps.append(("Compute the reference angle", f"Reference angle = tan⁻¹(|y|/|x|) = "
+                  f"tan⁻¹({abs(b):.4f}/{abs(a):.4f}) ≈ {ref_angle:.2f}°"))
+    steps.append(("Adjust for quadrant", f"Adjusting the reference angle for the "
+                  f"{quadrant.split(' ')[0]} quadrant gives θ ≈ {theta_deg:.2f}° "
+                  f"({theta:.4f} radians)."))
+
+    steps.append(("Write in polar form", f"z = r(cosθ + i sinθ) = "
+                  f"{r:.4f}(cos {theta_deg:.2f}° + i·sin {theta_deg:.2f}°)"))
+
+    check_a = r * math.cos(theta)
+    check_b = r * math.sin(theta)
+    steps.append(("Verify", f"Convert back: r·cosθ = {r:.4f}×cos({theta_deg:.2f}°) ≈ {check_a:.4f} ✓ "
+                  f"(matches x = {a})\nr·sinθ = {r:.4f}×sin({theta_deg:.2f}°) ≈ {check_b:.4f} ✓ "
+                  f"(matches y = {b})"))
+
     answer = f"z = {r:.4f} · (cos {theta_deg:.2f}° + i sin {theta_deg:.2f}°)"
     return steps, answer, {"r": r, "theta": theta, "a": a, "b": b}
 
 
 def solve_demoivre(a: float, b: float, n: int):
     steps = []
-    steps.append(("Convert to polar", f"Start from z = {a} + {b}i and convert to polar form first."))
+    steps.append(("Goal", f"Compute z^{n} where z = {a} + {b}i. Raising a complex number to "
+                  "a power directly in rectangular form means expanding a binomial many times — "
+                  "converting to polar form first makes this far simpler."))
+
+    # --- polar conversion sub-steps ---
     r = math.sqrt(a**2 + b**2)
+    steps.append(("Find the modulus", f"r = √(x² + y²) = √({a}² + {b}²) = √{a**2+b**2:g} = {r:.4f}"))
     theta = math.atan2(b, a)
-    steps.append(("Modulus & argument", f"r = {r:.4f},  θ = {math.degrees(theta):.2f}°"))
-    steps.append(("Apply De Moivre's theorem", f"zⁿ = rⁿ(cos(nθ) + i sin(nθ)),  n = {n}"))
+    theta_deg = math.degrees(theta)
+    quadrant = "1st" if a > 0 and b >= 0 else "2nd" if a < 0 and b >= 0 else "3rd" if a < 0 and b < 0 else "4th"
+    steps.append(("Find the argument", f"θ = tan⁻¹(y/x), adjusted for the {quadrant} quadrant "
+                  f"→ θ ≈ {theta_deg:.2f}° ({theta:.4f} rad)"))
+    steps.append(("Polar form", f"z = {r:.4f}(cos {theta_deg:.2f}° + i sin {theta_deg:.2f}°)"))
+
+    steps.append(("State De Moivre's theorem", "For any integer n: "
+                  "[r(cosθ + i sinθ)]ⁿ = rⁿ(cos(nθ) + i sin(nθ)). "
+                  "The modulus gets raised to the power n, and the argument gets multiplied by n."))
+
     r_n = r ** n
+    steps.append(("Raise the modulus", f"rⁿ = ({r:.4f})^{n} = {r_n:.4f}"))
+
+    theta_n_raw = theta_deg * n
     theta_n = theta * n
-    theta_n_deg = math.degrees(theta_n) % 360
-    steps.append(("Compute rⁿ and nθ", f"rⁿ = {r:.4f}^{n} = {r_n:.4f}\nnθ = {n} × {math.degrees(theta):.2f}° = {theta_n_deg:.2f}° (mod 360°)"))
-    real_part = r_n * math.cos(theta_n)
-    imag_part = r_n * math.sin(theta_n)
-    steps.append(("Convert back to rectangular", f"zⁿ = {r_n:.4f}(cos {theta_n_deg:.2f}° + i sin {theta_n_deg:.2f}°) = {real_part:.4f} + {imag_part:.4f}i"))
+    theta_n_deg = theta_n_raw % 360
+    if theta_n_raw != theta_n_deg:
+        steps.append(("Multiply the argument", f"nθ = {n} × {theta_deg:.2f}° = {theta_n_raw:.2f}°"))
+        steps.append(("Reduce to [0°, 360°)", f"{theta_n_raw:.2f}° mod 360° = {theta_n_deg:.2f}° "
+                      "— angles are periodic, so this is equivalent."))
+    else:
+        steps.append(("Multiply the argument", f"nθ = {n} × {theta_deg:.2f}° = {theta_n_deg:.2f}°"))
+
+    steps.append(("Result in polar form", f"z^{n} = {r_n:.4f}(cos {theta_n_deg:.2f}° + i sin {theta_n_deg:.2f}°)"))
+
+    cos_val = math.cos(theta_n)
+    sin_val = math.sin(theta_n)
+    steps.append(("Evaluate cos and sin", f"cos({theta_n_deg:.2f}°) ≈ {cos_val:.4f}\n"
+                  f"sin({theta_n_deg:.2f}°) ≈ {sin_val:.4f}"))
+
+    real_part = r_n * cos_val
+    imag_part = r_n * sin_val
+    steps.append(("Multiply through by rⁿ", f"Real part = {r_n:.4f} × {cos_val:.4f} = {real_part:.4f}\n"
+                  f"Imaginary part = {r_n:.4f} × {sin_val:.4f} = {imag_part:.4f}"))
+
+    steps.append(("Convert back to rectangular", f"z^{n} = {real_part:.4f} + {imag_part:.4f}i"))
     answer = f"z^{n} ≈ {real_part:.4f} + {imag_part:.4f}i"
     return steps, answer, {"r_n": r_n, "theta_n": theta_n, "real": real_part, "imag": imag_part}
 
@@ -188,18 +275,40 @@ def solve_permcomb(kind: str, n: int, r: int):
     steps = []
     n, r = int(n), int(r)
     if r > n:
-        return [("Invalid input", "r cannot be greater than n.")], "Undefined", {}
+        return [("Invalid input", "r cannot be greater than n — you can't choose or arrange "
+                 "more items than are available.")], "Undefined", {}
+
     if kind == "Permutation (nPr)":
+        steps.append(("What this counts", f"nPr counts the number of ways to arrange {r} items "
+                      f"out of {n} distinct items, where ORDER MATTERS."))
         steps.append(("Formula", "nPr = n! / (n − r)!"))
-        steps.append(("Substitute", f"{n}P{r} = {n}! / ({n} − {r})! = {n}! / {n-r}!"))
+        steps.append(("Substitute values", f"{n}P{r} = {n}! / ({n} − {r})! = {n}! / {n-r}!"))
+        steps.append(("Expand n!", f"{n}! = " + " × ".join(str(i) for i in range(n, 0, -1))))
+        steps.append(("Expand (n−r)!", f"{n-r}! = " + (" × ".join(str(i) for i in range(n-r, 0, -1)) if n-r > 0 else "1  (0! = 1 by definition)")))
+        steps.append(("Cancel the common factorial tail",
+                      f"{n}! / {n-r}! leaves only the top {r} descending terms, since everything "
+                      f"from {n-r}! downward cancels:\n"
+                      f"{n}P{r} = {' × '.join(str(i) for i in range(n, n-r, -1)) if r > 0 else '1'}"))
         val = math.perm(n, r)
-        steps.append(("Simplify", f"= {' × '.join(str(i) for i in range(n, n-r, -1))} = {val}"))
+        steps.append(("Multiply out", f"{' × '.join(str(i) for i in range(n, n-r, -1)) if r > 0 else '1'} = {val}"))
         answer = str(val)
     else:
-        steps.append(("Formula", "nCr = n! / (r! (n − r)!)"))
-        steps.append(("Substitute", f"{n}C{r} = {n}! / ({r}! × {n-r}!)"))
+        steps.append(("What this counts", f"nCr counts the number of ways to choose {r} items "
+                      f"out of {n} distinct items, where ORDER DOES NOT MATTER."))
+        steps.append(("Formula", "nCr = n! / (r! × (n − r)!)"))
+        steps.append(("Substitute values", f"{n}C{r} = {n}! / ({r}! × ({n}−{r})!) = {n}! / ({r}! × {n-r}!)"))
+        steps.append(("Expand n!", f"{n}! = " + " × ".join(str(i) for i in range(n, 0, -1))))
+        steps.append(("Cancel with (n−r)!", f"Dividing {n}! by {n-r}! leaves the top {r} terms: "
+                      f"{' × '.join(str(i) for i in range(n, n-r, -1)) if r > 0 else '1'}"))
+        steps.append(("Expand r!", f"{r}! = " + (" × ".join(str(i) for i in range(r, 0, -1)) if r > 0 else "1  (0! = 1 by definition)")))
+        numerator = math.perm(n, r)
+        denom = math.factorial(r)
+        steps.append(("Divide by r! to remove ordering",
+                      f"Since nPr counts ordered arrangements and each group of {r} items can be "
+                      f"ordered in {r}! ways, divide by {r}! to get unordered selections:\n"
+                      f"{n}C{r} = {numerator} / {denom}"))
         val = math.comb(n, r)
-        steps.append(("Simplify", f"= {val}"))
+        steps.append(("Simplify", f"{numerator} / {denom} = {val}"))
         answer = str(val)
     return steps, answer, {}
 
@@ -207,20 +316,65 @@ def solve_permcomb(kind: str, n: int, r: int):
 def solve_functions(domain: list, codomain: list, mapping: dict):
     """mapping: dict domain_element -> codomain_element"""
     steps = []
-    steps.append(("Set up", f"Domain = {domain}, Codomain = {codomain}, mapping f = {mapping}"))
-    images = list(mapping.values())
-    is_injective = len(images) == len(set(images))
-    steps.append(("Check injectivity (one-one)",
-                  "No two distinct domain elements share an image." if is_injective
-                  else "Two or more domain elements map to the same image → not injective."))
-    is_surjective = set(codomain) == set(images)
-    unmapped = set(codomain) - set(images)
-    steps.append(("Check surjectivity (onto)",
-                  "Every element of the codomain is hit by some domain element." if is_surjective
-                  else f"Codomain element(s) {sorted(unmapped)} have no pre-image → not surjective."))
+    steps.append(("Set up", f"Domain A = {domain}\nCodomain B = {codomain}\n"
+                  f"Mapping f: A → B is given by f = {mapping}"))
+    steps.append(("List the images explicitly",
+                  "\n".join(f"f({d}) = {c}" for d, c in mapping.items())))
+
+    # --- injectivity, pair by pair ---
+    steps.append(("Injectivity definition", "f is injective (one-one) if f(x₁) = f(x₂) "
+                  "implies x₁ = x₂ — i.e. distinct inputs always give distinct outputs. "
+                  "We check this by comparing every pair of domain elements."))
+    images = list(mapping.items())
+    collisions = []
+    checked_pairs = 0
+    for i in range(len(images)):
+        for j in range(i + 1, len(images)):
+            d1, c1 = images[i]
+            d2, c2 = images[j]
+            checked_pairs += 1
+            if c1 == c2:
+                collisions.append((d1, d2, c1))
+                steps.append((f"Compare f({d1}) and f({d2})",
+                              f"f({d1}) = {c1}, f({d2}) = {c2} → EQUAL, but {d1} ≠ {d2} "
+                              "→ this breaks injectivity."))
+    is_injective = len(collisions) == 0
+    if is_injective:
+        steps.append(("Injectivity result", f"Checked all {checked_pairs} pair(s) of domain "
+                      "elements — no two share an image. f is INJECTIVE."))
+    else:
+        steps.append(("Injectivity result", f"Found {len(collisions)} colliding pair(s) — "
+                      "f is NOT injective."))
+
+    # --- surjectivity, element by element ---
+    steps.append(("Surjectivity definition", "f is surjective (onto) if every element of the "
+                  "codomain has at least one pre-image in the domain — i.e. the range equals "
+                  "the whole codomain B."))
+    image_set = set(mapping.values())
+    for c in codomain:
+        preimages = [d for d, v in mapping.items() if v == c]
+        if preimages:
+            steps.append((f"Check codomain element {c}",
+                          f"Pre-image(s): {preimages} → covered ✓"))
+        else:
+            steps.append((f"Check codomain element {c}",
+                          f"No domain element maps to {c} → NOT covered ✗"))
+    is_surjective = set(codomain) == image_set
+    unmapped = set(codomain) - image_set
+    if is_surjective:
+        steps.append(("Surjectivity result", "Every codomain element has a pre-image. "
+                      "f is SURJECTIVE."))
+    else:
+        steps.append(("Surjectivity result", f"Codomain element(s) {sorted(unmapped)} have no "
+                      "pre-image — f is NOT surjective."))
+
     is_bijective = is_injective and is_surjective
-    steps.append(("Conclusion", "Bijective (both injective and surjective)." if is_bijective
-                  else "Not bijective."))
+    steps.append(("Bijectivity definition", "f is bijective if and only if it is BOTH "
+                  "injective AND surjective."))
+    steps.append(("Conclusion", f"Injective: {'Yes' if is_injective else 'No'}. "
+                  f"Surjective: {'Yes' if is_surjective else 'No'}. "
+                  f"→ {'Bijective' if is_bijective else 'Not bijective'}."))
+
     classification = []
     if is_injective: classification.append("Injective")
     if is_surjective: classification.append("Surjective")
@@ -237,35 +391,81 @@ def solve_limit(expr_str: str, var_str: str, point_str: str):
     point = oo if point_str.strip() in ("inf", "infinity", "oo") else \
             -oo if point_str.strip() in ("-inf", "-infinity", "-oo") else sympify(point_str)
 
-    steps.append(("Original expression", f"lim_{{{var_str}→{point_str}}} {expr}"))
+    steps.append(("Original expression", f"Evaluate lim_{{{var_str}→{point_str}}} {expr}"))
+    steps.append(("Strategy", "Always try direct substitution first. If it gives a finite, "
+                  "well-defined value, that's the limit. If it produces an indeterminate form "
+                  "like 0/0 or ∞/∞, we need to simplify algebraically (factor/cancel, "
+                  "rationalize, or use a known standard limit) before substituting again."))
 
     # try direct substitution first
+    is_indeterminate = False
     try:
         direct = expr.subs(x, point)
-        if direct.is_finite and not direct.has(sp.zoo, sp.nan):
-            steps.append(("Direct substitution", f"Substitute {var_str} = {point_str}: result is finite → {direct}"))
-            result = direct
+        direct_simplified = sp.simplify(direct)
+        if direct_simplified.is_finite and not direct_simplified.has(sp.zoo, sp.nan):
+            steps.append(("Try direct substitution",
+                          f"Substitute {var_str} = {point_str} directly:\n"
+                          f"f({point_str}) = {direct} = {direct_simplified}"))
+            steps.append(("Check the result", f"This is a finite, defined number → "
+                          "no further work needed."))
+            result = direct_simplified
         else:
             raise ValueError("indeterminate")
     except Exception:
-        steps.append(("Direct substitution", f"Substituting {var_str} = {point_str} gives an indeterminate form (0/0 or ∞/∞) — simplify or apply L'Hôpital's rule."))
-        result = limit(expr, x, point)
-        simplified = sp.simplify(expr)
-        if simplified != expr:
-            steps.append(("Simplify", f"Simplify the expression: {simplified}"))
-        steps.append(("Evaluate the limit", f"L = {result}"))
+        is_indeterminate = True
+        try:
+            direct_form = expr.subs(x, point)
+        except Exception:
+            direct_form = "undefined"
+        steps.append(("Try direct substitution",
+                      f"Substitute {var_str} = {point_str}: f({point_str}) → {direct_form} "
+                      "(an indeterminate or undefined form)."))
+        steps.append(("Identify the indeterminate form",
+                      "This is a classic 0/0 (or ∞/∞) indeterminate form — direct substitution "
+                      "doesn't work here, so we simplify the expression algebraically first."))
 
-    # continuity check at the point (only for finite points)
+        simplified = sp.simplify(expr)
+        factored = sp.factor(expr) if expr.is_rational_function() else None
+        if simplified != expr:
+            steps.append(("Simplify algebraically",
+                          f"Simplify the expression:\n{expr}  →  {simplified}\n"
+                          "(common factors between numerator and denominator cancel, or a "
+                          "known identity applies)."))
+        elif factored is not None and factored != expr:
+            steps.append(("Factor the expression", f"{expr}  →  {factored}"))
+            simplified = factored
+
+        steps.append(("Re-substitute after simplifying",
+                      f"Now substitute {var_str} = {point_str} into the simplified form."))
+
+        result = limit(expr, x, point)
+        steps.append(("Evaluate", f"lim_{{{var_str}→{point_str}}} {expr} = {result}"))
+
+    # continuity check at the point (only for finite points) — full 3-part definition
     continuity_note = None
     if point not in (oo, -oo):
+        steps.append(("Continuity check — 3-part definition",
+                      "f is continuous at a point c if: (1) f(c) is defined, "
+                      "(2) lim_{x→c} f(x) exists, and (3) lim_{x→c} f(x) = f(c). "
+                      "All three must hold."))
         try:
             f_val = expr.subs(x, point)
-            if sp.simplify(f_val - result) == 0 and f_val.is_finite:
-                continuity_note = f"f({var_str}) is continuous at {var_str} = {point_str} since lim = f({point_str}) = {result}."
+            f_defined = f_val.is_finite and not f_val.has(sp.zoo, sp.nan)
+            steps.append((f"(1) Is f({point_str}) defined?",
+                          f"f({point_str}) = {f_val}" + (" — defined ✓" if f_defined else " — undefined ✗")))
+            limit_exists = result.is_finite if hasattr(result, "is_finite") else True
+            steps.append((f"(2) Does the limit exist?",
+                          f"lim = {result}" + (" — exists ✓" if limit_exists else " — does not exist ✗")))
+            values_match = f_defined and sp.simplify(f_val - result) == 0
+            steps.append((f"(3) Does lim = f({point_str})?",
+                          (f"{result} = {f_val} ✓" if values_match else f"{result} ≠ {f_val} (or f undefined) ✗")))
+            if f_defined and limit_exists and values_match:
+                continuity_note = f"f({var_str}) is continuous at {var_str} = {point_str}: all three conditions hold."
             else:
-                continuity_note = f"f({var_str}) is NOT continuous at {var_str} = {point_str} (limit ≠ function value, or function undefined there)."
+                continuity_note = f"f({var_str}) is NOT continuous at {var_str} = {point_str}: at least one condition fails (this may be a removable discontinuity)."
         except Exception:
             continuity_note = None
+
     steps.append(("Final result", f"lim_{{{var_str}→{point_str}}} {expr} = {result}"))
     answer = str(result)
     return steps, answer, {"continuity_note": continuity_note, "expr": expr, "var": x, "point": point}
