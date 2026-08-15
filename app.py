@@ -607,16 +607,239 @@ def push_history(question, topic, answer):
 
 
 # ============================================================
-# SIDEBAR NAV
+# SHARED RESULT RENDERER (steps, viz, export) — used by every topic page
 # ============================================================
-st.sidebar.markdown("## 🧮 MathMate")
-st.sidebar.caption("Interactive Mathematics Lab")
-page = st.sidebar.radio("Navigate", ["🏠 Home", "✨ Solve", "🎯 Practice & Quiz", "🕘 History"], label_visibility="collapsed")
+def render_result(chosen_key, topic_label, question_text, steps, answer, extra,
+                   viz_fig=None, continuity_note=None):
+    if not steps:
+        return
+    st.markdown("### Step-by-step solution")
+    render_steps(steps)
+    st.markdown(f'<div class="result-box">✅ Final answer: {answer}</div>', unsafe_allow_html=True)
+    st.session_state.streak += 1
+    push_history(question_text or f"{topic_label} problem", topic_label, answer)
 
+    if viz_fig is not None:
+        st.markdown("### Visualization")
+        st.pyplot(viz_fig)
+    if continuity_note:
+        st.info(continuity_note)
+
+    st.markdown("### Save / Export")
+    e1, e2, e3, e4 = st.columns(4)
+    with e1:
+        st.button("📋 Copy answer", key=f"copy_{chosen_key}", help="Answer shown above — select & copy.")
+    with e2:
+        if DOCX_AVAILABLE:
+            buf = build_docx(question_text or topic_label, topic_label, steps, answer)
+            st.download_button("⬇️ DOCX", buf, file_name="mathmate_solution.docx", key=f"docx_{chosen_key}")
+        else:
+            st.caption("Add `python-docx` to enable DOCX export.")
+    with e3:
+        if REPORTLAB_AVAILABLE:
+            buf = build_pdf(question_text or topic_label, topic_label, steps, answer)
+            st.download_button("⬇️ PDF", buf, file_name="mathmate_solution.pdf", key=f"pdf_{chosen_key}")
+        else:
+            st.caption("Add `reportlab` to enable PDF export.")
+    with e4:
+        st.button("🔗 Share link", key=f"share_{chosen_key}", help="Wire this up to your own link-sharing/backend.")
+
+
+def scan_input_block(key_prefix):
+    """Reusable Type / Paste / Scan block that returns whatever text the user entered.
+    Each topic page still uses its own structured number/text inputs to actually solve —
+    this is only for capturing the original question wording (for history/export)."""
+    mode = st.radio("Input method", ["Type", "Paste", "Scan (image upload)"],
+                     horizontal=True, key=f"{key_prefix}_mode")
+    text = ""
+    if mode == "Scan (image upload)":
+        img_file = st.file_uploader("Upload a photo of your question", type=["png", "jpg", "jpeg"], key=f"{key_prefix}_upl")
+        cam_file = st.camera_input("...or capture with your camera", key=f"{key_prefix}_cam")
+        source = img_file or cam_file
+        if source:
+            if OCR_AVAILABLE:
+                image = Image.open(source)
+                st.image(image, caption="Uploaded question", width=300)
+                ocr_text = pytesseract.image_to_string(image)
+                text = st.text_area("OCR result (edit if needed)", value=ocr_text, key=f"{key_prefix}_ocr")
+            else:
+                st.warning("OCR isn't available on this deployment (pytesseract/tesseract not installed). "
+                           "Add `pytesseract` to requirements.txt and `tesseract-ocr` to packages.txt, "
+                           "or type/paste the question below instead.")
+                text = st.text_area("Type the question from your image", "", key=f"{key_prefix}_fallback")
+    else:
+        text = st.text_area("Question (optional — for your records/history)",
+                             placeholder="Paste or type the original question here…",
+                             height=80, key=f"{key_prefix}_text")
+    return text
+
+
+def back_to_home():
+    if st.button("← All topics", key=f"back_{st.session_state.page}"):
+        st.session_state.page = "home"
+        st.rerun()
+
+
+# ============================================================
+# PER-TOPIC PAGES — each is its own dedicated landing, not a shared form
+# ============================================================
+def page_gcd():
+    back_to_home()
+    st.markdown('<span class="topic-badge">🧮 EUCLIDEAN ALGORITHM & GCD</span>', unsafe_allow_html=True)
+    st.title(TOPICS["gcd"])
+    st.write("Find the greatest common divisor of two integers using repeated division.")
+    q_text = scan_input_block("gcd")
+    st.markdown("---")
+    c1, c2 = st.columns(2)
+    a = c1.number_input("a", value=1071, step=1, key="gcd_a")
+    b = c2.number_input("b", value=462, step=1, key="gcd_b")
+    if st.button("Solve step-by-step", type="primary", key="gcd_solve"):
+        steps, answer, extra = solve_gcd(a, b)
+        render_result("gcd", TOPICS["gcd"], q_text or f"gcd({a}, {b})", steps, answer, extra)
+
+
+def page_complex():
+    back_to_home()
+    st.markdown('<span class="topic-badge">📍 COMPLEX NUMBERS & POLAR FORM</span>', unsafe_allow_html=True)
+    st.title(TOPICS["complex"])
+    st.write("Convert a complex number from rectangular (a + bi) form to polar form.")
+    q_text = scan_input_block("complex")
+    st.markdown("---")
+    c1, c2 = st.columns(2)
+    a = c1.number_input("Real part (a)", value=1.0, key="cx_a")
+    b = c2.number_input("Imaginary part (b)", value=1.7320508, key="cx_b")
+    if st.button("Solve step-by-step", type="primary", key="cx_solve"):
+        steps, answer, extra = solve_complex_to_polar(a, b)
+        fig = plot_complex_plane([(extra["a"], extra["b"])], ["z"])
+        render_result("complex", TOPICS["complex"], q_text or f"Convert {a}+{b}i to polar form",
+                       steps, answer, extra, viz_fig=fig)
+
+
+def page_demoivre():
+    back_to_home()
+    st.markdown('<span class="topic-badge">🔄 DE MOIVRE\'S THEOREM</span>', unsafe_allow_html=True)
+    st.title(TOPICS["demoivre"])
+    st.write("Raise a complex number to a power, or find all its n-th roots, using De Moivre's theorem.")
+    q_text = scan_input_block("demoivre")
+    st.markdown("---")
+    c1, c2, c3 = st.columns(3)
+    a = c1.number_input("Real part (a)", value=1.0, key="dm_a")
+    b = c2.number_input("Imaginary part (b)", value=1.7320508, key="dm_b")
+    n = c3.number_input("Power n", value=4, step=1, key="dm_n")
+    show_roots = st.checkbox("Also show all n-th roots of z (instead of zⁿ)", key="dm_roots")
+    if st.button("Solve step-by-step", type="primary", key="dm_solve"):
+        if show_roots:
+            roots, r_root = demoivre_roots(a, b, int(n))
+            steps = [("Convert to polar", f"z = {a} + {b}i → r = {math.hypot(a,b):.4f}, θ = {math.degrees(math.atan2(b,a)):.2f}°")]
+            steps.append(("Root formula", f"wₖ = r^(1/n) [cos((θ+2πk)/n) + i sin((θ+2πk)/n)],  k = 0,…,{int(n)-1}"))
+            for k, (re_, im_, ang) in enumerate(roots):
+                steps.append((f"Root k={k}", f"w{k} = {re_:.4f} + {im_:.4f}i  (angle {ang:.2f}°)"))
+            answer = ", ".join(f"{re_:.3f}+{im_:.3f}i" for re_, im_, _ in roots)
+            extra = {"roots": roots}
+            pts = [(re_, im_) for re_, im_, _ in roots]
+            labs = [f"w{k}" for k in range(len(pts))]
+            fig = plot_complex_plane(pts, labs)
+        else:
+            steps, answer, extra = solve_demoivre(a, b, int(n))
+            fig = plot_complex_plane([(extra["real"], extra["imag"])], ["zⁿ"], colors=[AMBER])
+        render_result("demoivre", TOPICS["demoivre"], q_text or f"z={a}+{b}i, n={int(n)}",
+                       steps, answer, extra, viz_fig=fig)
+
+
+def page_permcomb():
+    back_to_home()
+    st.markdown('<span class="topic-badge">🔢 PERMUTATIONS & COMBINATIONS</span>', unsafe_allow_html=True)
+    st.title(TOPICS["permcomb"])
+    st.write("Count arrangements (order matters) or selections (order doesn't matter) from n items.")
+    q_text = scan_input_block("pc")
+    st.markdown("---")
+    c1, c2, c3 = st.columns(3)
+    kind = c1.selectbox("Type", ["Permutation (nPr)", "Combination (nCr)"], key="pc_kind")
+    n = c2.number_input("n", value=5, step=1, min_value=0, key="pc_n")
+    r = c3.number_input("r", value=2, step=1, min_value=0, key="pc_r")
+    if st.button("Solve step-by-step", type="primary", key="pc_solve"):
+        steps, answer, extra = solve_permcomb(kind, n, r)
+        render_result("permcomb", TOPICS["permcomb"], q_text or f"{kind}: n={n}, r={r}", steps, answer, extra)
+
+
+def page_functions():
+    back_to_home()
+    st.markdown('<span class="topic-badge">🔗 INJECTIVE, SURJECTIVE & BIJECTIVE FUNCTIONS</span>', unsafe_allow_html=True)
+    st.title(TOPICS["functions"])
+    st.write("Define a finite function by its mapping and classify it.")
+    q_text = scan_input_block("fn")
+    st.markdown("---")
+    c1, c2 = st.columns(2)
+    domain_str = c1.text_input("Domain elements (comma-separated)", "1,2,3", key="fn_dom")
+    codomain_str = c2.text_input("Codomain elements (comma-separated)", "a,b,c,d", key="fn_cod")
+    domain = [x.strip() for x in domain_str.split(",") if x.strip()]
+    codomain = [x.strip() for x in codomain_str.split(",") if x.strip()]
+    st.write("Map each domain element to a codomain element:")
+    mapping = {}
+    mcols = st.columns(min(len(domain), 4) or 1)
+    for i, d in enumerate(domain):
+        with mcols[i % len(mcols)]:
+            mapping[d] = st.selectbox(f"f({d}) =", codomain, key=f"fn_map_{d}")
+    if st.button("Classify function", type="primary", key="fn_solve"):
+        steps, answer, extra = solve_functions(domain, codomain, mapping)
+        fig = plot_function_diagram(domain, codomain, mapping)
+        render_result("functions", TOPICS["functions"], q_text or f"f: {domain} → {codomain}",
+                       steps, answer, extra, viz_fig=fig)
+
+
+def page_limits():
+    back_to_home()
+    st.markdown('<span class="topic-badge">📈 LIMITS & CONTINUITY</span>', unsafe_allow_html=True)
+    st.title(TOPICS["limits"])
+    st.write("Evaluate a limit symbolically and check continuity at the target point.")
+    q_text = scan_input_block("lim")
+    st.markdown("---")
+    c1, c2, c3 = st.columns(3)
+    expr_str = c1.text_input("f(x) =", "sin(3*x)/x", key="lim_expr")
+    var_str = c2.text_input("Variable", "x", key="lim_var")
+    point_str = c3.text_input("x →", "0", key="lim_point")
+    if st.button("Solve step-by-step", type="primary", key="lim_solve"):
+        try:
+            steps, answer, extra = solve_limit(expr_str, var_str, point_str)
+            fig = plot_limit_function(extra["expr"], extra["var"], extra["point"])
+            render_result("limits", TOPICS["limits"], q_text or f"lim({var_str}→{point_str}) {expr_str}",
+                           steps, answer, extra, viz_fig=fig, continuity_note=extra.get("continuity_note"))
+        except Exception as e:
+            st.error(f"Couldn't parse that expression: {e}")
+
+
+TOPIC_PAGES = {
+    "gcd": page_gcd,
+    "complex": page_complex,
+    "demoivre": page_demoivre,
+    "permcomb": page_permcomb,
+    "functions": page_functions,
+    "limits": page_limits,
+}
+
+
+# ============================================================
+# SIDEBAR NAV — all navigation goes through st.session_state.page
+# ============================================================
+if "page" not in st.session_state:
+    st.session_state.page = "home"
 if "streak" not in st.session_state:
     st.session_state.streak = 0
 if "quiz_score" not in st.session_state:
     st.session_state.quiz_score = {"correct": 0, "total": 0}
+
+st.sidebar.markdown("## 🧮 MathMate")
+st.sidebar.caption("Interactive Mathematics Lab")
+
+if st.sidebar.button("🏠 Home", use_container_width=True):
+    st.session_state.page = "home"
+    st.rerun()
+if st.sidebar.button("🎯 Practice & Quiz", use_container_width=True):
+    st.session_state.page = "practice"
+    st.rerun()
+if st.sidebar.button("🕘 History", use_container_width=True):
+    st.session_state.page = "history"
+    st.rerun()
 
 st.sidebar.markdown("---")
 st.sidebar.metric("🔥 Streak", st.session_state.streak)
@@ -626,185 +849,31 @@ if st.session_state.quiz_score["total"] > 0:
 
 
 # ============================================================
-# PAGE: HOME
+# PAGE: HOME — each topic card is its own button, routing to its own page
 # ============================================================
-if page == "🏠 Home":
+if st.session_state.page == "home":
     st.title("🧮 MathMate")
     st.subheader("Scan → Detect Topic → Solve Step-by-Step → Understand → Save")
-    st.write("Six syllabus topics, one lab. Pick a topic below or head to **Solve** to enter a question directly.")
+    st.write("Six syllabus topics, one lab. Pick a topic below — each opens its own dedicated page.")
     cols = st.columns(3)
     for i, (key, label) in enumerate(TOPICS.items()):
         with cols[i % 3]:
-            st.markdown(f"""
-            <div class="step-box" style="min-height:110px;">
-                <div class="step-title">{label}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            if st.button(label, key=f"card_{key}", use_container_width=True):
+                st.session_state.page = key
+                st.rerun()
 
 
 # ============================================================
-# PAGE: SOLVE
+# PAGE: individual topic pages
 # ============================================================
-elif page == "✨ Solve":
-    st.title("Solve a question")
-
-    input_mode = st.radio("Input method", ["Type", "Paste", "Scan (image upload)"], horizontal=True)
-    question_text = ""
-
-    if input_mode == "Scan (image upload)":
-        img_file = st.file_uploader("Upload a photo of your question", type=["png", "jpg", "jpeg"])
-        cam_file = st.camera_input("...or capture with your camera")
-        source = img_file or cam_file
-        if source:
-            if OCR_AVAILABLE:
-                image = Image.open(source)
-                st.image(image, caption="Uploaded question", width=300)
-                question_text = pytesseract.image_to_string(image)
-                st.text_area("OCR result (edit if needed)", value=question_text, key="ocr_text")
-                question_text = st.session_state.get("ocr_text", question_text)
-            else:
-                st.warning("OCR isn't available on this deployment (pytesseract/tesseract not installed). "
-                           "Add `pytesseract` to requirements.txt and `tesseract-ocr` to packages.txt, "
-                           "or type/paste the question below instead.")
-                question_text = st.text_area("Type the question from your image", "")
-    else:
-        question_text = st.text_area("Enter your question",
-                                      placeholder="e.g. Find z⁴ if z = 1 + i√3, expressing the answer in rectangular form.",
-                                      height=100)
-
-    detected = detect_topic(question_text) if question_text else None
-    topic_options = list(TOPICS.keys())
-    default_idx = topic_options.index(detected) if detected else 0
-    if detected:
-        st.markdown(f'<span class="topic-badge">DETECTED: {TOPICS[detected]}</span>', unsafe_allow_html=True)
-    chosen = st.selectbox("Topic (auto-detected — override if needed)",
-                           topic_options, index=default_idx, format_func=lambda k: TOPICS[k])
-    st.markdown("---")
-
-    steps, answer, extra = None, None, {}
-
-    if chosen == "gcd":
-        c1, c2 = st.columns(2)
-        a = c1.number_input("a", value=1071, step=1)
-        b = c2.number_input("b", value=462, step=1)
-        if st.button("Solve step-by-step", type="primary"):
-            steps, answer, extra = solve_gcd(a, b)
-
-    elif chosen == "complex":
-        c1, c2 = st.columns(2)
-        a = c1.number_input("Real part (a)", value=1.0)
-        b = c2.number_input("Imaginary part (b)", value=1.7320508)
-        if st.button("Solve step-by-step", type="primary"):
-            steps, answer, extra = solve_complex_to_polar(a, b)
-
-    elif chosen == "demoivre":
-        c1, c2, c3 = st.columns(3)
-        a = c1.number_input("Real part (a)", value=1.0)
-        b = c2.number_input("Imaginary part (b)", value=1.7320508)
-        n = c3.number_input("Power n", value=4, step=1)
-        show_roots = st.checkbox("Also show all n-th roots of z (instead of zⁿ)")
-        if st.button("Solve step-by-step", type="primary"):
-            if show_roots:
-                roots, r_root = demoivre_roots(a, b, int(n))
-                steps = [("Convert to polar", f"z = {a} + {b}i → r = {math.hypot(a,b):.4f}, θ = {math.degrees(math.atan2(b,a)):.2f}°")]
-                steps.append(("Root formula", f"wₖ = r^(1/n) [cos((θ+2πk)/n) + i sin((θ+2πk)/n)],  k = 0,…,{int(n)-1}"))
-                for k, (re_, im_, ang) in enumerate(roots):
-                    steps.append((f"Root k={k}", f"w{k} = {re_:.4f} + {im_:.4f}i  (angle {ang:.2f}°)"))
-                answer = ", ".join(f"{re_:.3f}+{im_:.3f}i" for re_, im_, _ in roots)
-                extra = {"roots": roots}
-            else:
-                steps, answer, extra = solve_demoivre(a, b, int(n))
-
-    elif chosen == "permcomb":
-        c1, c2, c3 = st.columns(3)
-        kind = c1.selectbox("Type", ["Permutation (nPr)", "Combination (nCr)"])
-        n = c2.number_input("n", value=5, step=1, min_value=0)
-        r = c3.number_input("r", value=2, step=1, min_value=0)
-        if st.button("Solve step-by-step", type="primary"):
-            steps, answer, extra = solve_permcomb(kind, n, r)
-
-    elif chosen == "functions":
-        st.caption("Define a finite function by its mapping to classify it.")
-        c1, c2 = st.columns(2)
-        domain_str = c1.text_input("Domain elements (comma-separated)", "1,2,3")
-        codomain_str = c2.text_input("Codomain elements (comma-separated)", "a,b,c,d")
-        domain = [x.strip() for x in domain_str.split(",") if x.strip()]
-        codomain = [x.strip() for x in codomain_str.split(",") if x.strip()]
-        st.write("Map each domain element to a codomain element:")
-        mapping = {}
-        mcols = st.columns(min(len(domain), 4) or 1)
-        for i, d in enumerate(domain):
-            with mcols[i % len(mcols)]:
-                mapping[d] = st.selectbox(f"f({d}) =", codomain, key=f"map_{d}")
-        if st.button("Classify function", type="primary"):
-            steps, answer, extra = solve_functions(domain, codomain, mapping)
-
-    elif chosen == "limits":
-        c1, c2, c3 = st.columns(3)
-        expr_str = c1.text_input("f(x) =", "sin(3*x)/x")
-        var_str = c2.text_input("Variable", "x")
-        point_str = c3.text_input("x →", "0")
-        if st.button("Solve step-by-step", type="primary"):
-            try:
-                steps, answer, extra = solve_limit(expr_str, var_str, point_str)
-            except Exception as e:
-                st.error(f"Couldn't parse that expression: {e}")
-
-    # ---- render result ----
-    if steps:
-        st.markdown("### Step-by-step solution")
-        render_steps(steps)
-        st.markdown(f'<div class="result-box">✅ Final answer: {answer}</div>', unsafe_allow_html=True)
-        st.session_state.streak += 1
-        push_history(question_text or f"{TOPICS[chosen]} problem", TOPICS[chosen], answer)
-
-        # visualization
-        st.markdown("### Visualization")
-        if chosen == "complex":
-            fig = plot_complex_plane([(extra["a"], extra["b"])], ["z"])
-            st.pyplot(fig)
-        elif chosen == "demoivre":
-            if "roots" in extra:
-                pts = [(re_, im_) for re_, im_, _ in extra["roots"]]
-                labs = [f"w{k}" for k in range(len(pts))]
-                st.pyplot(plot_complex_plane(pts, labs))
-            else:
-                st.pyplot(plot_complex_plane([(extra["real"], extra["imag"])], ["zⁿ"], colors=[AMBER]))
-        elif chosen == "functions":
-            st.pyplot(plot_function_diagram(
-                [x.strip() for x in domain_str.split(",") if x.strip()],
-                [x.strip() for x in codomain_str.split(",") if x.strip()],
-                mapping))
-        elif chosen == "limits":
-            st.pyplot(plot_limit_function(extra["expr"], extra["var"], extra["point"]))
-            if extra.get("continuity_note"):
-                st.info(extra["continuity_note"])
-
-        # ---- export / actions ----
-        st.markdown("### Save / Export")
-        e1, e2, e3, e4 = st.columns(4)
-        with e1:
-            st.button("📋 Copy answer", on_click=lambda: None, help="Answer shown above — select & copy.")
-        with e2:
-            if DOCX_AVAILABLE:
-                buf = build_docx(question_text or TOPICS[chosen], TOPICS[chosen], steps, answer)
-                st.download_button("⬇️ DOCX", buf, file_name="mathmate_solution.docx")
-            else:
-                st.caption("Add `python-docx` to enable DOCX export.")
-        with e3:
-            if REPORTLAB_AVAILABLE:
-                buf = build_pdf(question_text or TOPICS[chosen], TOPICS[chosen], steps, answer)
-                st.download_button("⬇️ PDF", buf, file_name="mathmate_solution.pdf")
-            else:
-                st.caption("Add `reportlab` to enable PDF export.")
-        with e4:
-            st.button("🔗 Share link", help="Wire this up to your own link-sharing/backend.")
+elif st.session_state.page in TOPIC_PAGES:
+    TOPIC_PAGES[st.session_state.page]()
 
 
 # ============================================================
 # PAGE: PRACTICE & QUIZ
 # ============================================================
-elif page == "🎯 Practice & Quiz":
+elif st.session_state.page == "practice":
     st.title("Practice & Quiz")
     QUESTION_BANK = [
         {"q": "Find gcd(48, 18) using the Euclidean algorithm.", "topic": "gcd",
@@ -849,11 +918,11 @@ elif page == "🎯 Practice & Quiz":
 # ============================================================
 # PAGE: HISTORY
 # ============================================================
-elif page == "🕘 History":
+elif st.session_state.page == "history":
     st.title("Solution history")
     history = st.session_state.get("history", [])
     if not history:
-        st.info("No solved questions yet — head to **Solve** to get started.")
+        st.info("No solved questions yet — pick a topic on **Home** to get started.")
     else:
         for item in history:
             with st.expander(f"{item['topic']} · {item['time']}"):
