@@ -77,6 +77,36 @@ h1, h2, h3, h4, p, span, label, .stMarkdown {{ color: {PAPER}; }}
     font-size: 0.8rem; font-weight: 700; letter-spacing: .04em;
 }}
 [data-testid="stSidebar"] {{ background-color: #0D1730; }}
+
+/* ---- Home page topic cards ---- */
+[data-testid="stVerticalBlockBorderWrapper"]:has(.card-marker) {{
+    border-radius: 16px !important;
+    border: 1px solid rgba(247,245,239,0.14) !important;
+    background: linear-gradient(180deg, rgba(247,245,239,0.05), rgba(247,245,239,0.02));
+    padding: 6px 4px 2px 4px;
+    transition: border-color .15s ease, transform .15s ease, background .15s ease;
+}}
+[data-testid="stVerticalBlockBorderWrapper"]:has(.card-marker):hover {{
+    border-color: rgba(46,196,182,0.55) !important;
+    background: linear-gradient(180deg, rgba(46,196,182,0.08), rgba(247,245,239,0.02));
+    transform: translateY(-2px);
+}}
+.card-icon {{
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 42px; height: 42px; border-radius: 10px;
+    background: rgba(46,196,182,0.15); font-size: 22px; margin-bottom: 10px;
+}}
+.card-title {{
+    font-weight: 700; font-size: 1.02rem; color: {PAPER}; margin: 4px 0 6px 0;
+    line-height: 1.3;
+}}
+.card-blurb {{
+    color: rgba(247,245,239,0.65); font-size: 0.85rem; line-height: 1.4;
+    min-height: 40px; margin-bottom: 12px;
+}}
+div[data-testid="stVerticalBlockBorderWrapper"] .stButton > button {{
+    border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -91,6 +121,22 @@ TOPICS = {
     "permcomb": "🔢 Permutations & Combinations",
     "functions": "🔗 Injective, Surjective & Bijective Functions",
     "limits": "📈 Limits & Continuity",
+}
+
+# icon / title / blurb split out for the Home page card grid
+TOPIC_META = {
+    "gcd":       {"icon": "🧮", "title": "Euclidean Algorithm & GCD",
+                  "blurb": "Find the HCF of two numbers via repeated division."},
+    "complex":   {"icon": "📍", "title": "Complex Numbers & Polar Form",
+                  "blurb": "Convert between rectangular and polar form."},
+    "demoivre":  {"icon": "🔄", "title": "De Moivre's Theorem",
+                  "blurb": "Powers and n-th roots of complex numbers."},
+    "permcomb":  {"icon": "🔢", "title": "Permutations & Combinations",
+                  "blurb": "Count arrangements and selections."},
+    "functions": {"icon": "🔗", "title": "Injective, Surjective & Bijective",
+                  "blurb": "Classify a mapping between finite sets."},
+    "limits":    {"icon": "📈", "title": "Limits & Continuity",
+                  "blurb": "Evaluate limits and test continuity at a point."},
 }
 
 TOPIC_KEYWORDS = {
@@ -849,18 +895,28 @@ if st.session_state.quiz_score["total"] > 0:
 
 
 # ============================================================
-# PAGE: HOME — each topic card is its own button, routing to its own page
+# PAGE: HOME — each topic is a real card with icon/blurb, routing to its own page
 # ============================================================
 if st.session_state.page == "home":
     st.title("🧮 MathMate")
     st.subheader("Scan → Detect Topic → Solve Step-by-Step → Understand → Save")
     st.write("Six syllabus topics, one lab. Pick a topic below — each opens its own dedicated page.")
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
     cols = st.columns(3)
-    for i, (key, label) in enumerate(TOPICS.items()):
+    for i, key in enumerate(TOPIC_META):
+        meta = TOPIC_META[key]
         with cols[i % 3]:
-            if st.button(label, key=f"card_{key}", use_container_width=True):
-                st.session_state.page = key
-                st.rerun()
+            with st.container(border=True):
+                st.markdown('<div class="card-marker"></div>', unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class="card-icon">{meta['icon']}</div>
+                    <div class="card-title">{meta['title']}</div>
+                    <div class="card-blurb">{meta['blurb']}</div>
+                """, unsafe_allow_html=True)
+                if st.button("Open →", key=f"card_{key}", use_container_width=True, type="primary"):
+                    st.session_state.page = key
+                    st.rerun()
 
 
 # ============================================================
