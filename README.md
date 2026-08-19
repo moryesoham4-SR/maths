@@ -18,19 +18,14 @@ streamlit run app.py
 
 ## Deploy to Streamlit Cloud
 
-1. Push `app.py`, `requirements.txt`, and `packages.txt` to your GitHub repo (e.g. `mathmate-ai`).
+1. Push `app.py` and `requirements.txt` to your GitHub repo (e.g. `mathmate-ai`).
 2. On Streamlit Cloud, point the app at `app.py`.
-3. `packages.txt` installs the `tesseract-ocr` apt package needed for the
-   "Scan (image upload)" OCR feature. Without it, the app still works —
-   it just falls back to a manual text box for scanned questions.
 
 ## Notes on the current build
 
 - **Topic detection** is keyword-based (see `TOPIC_KEYWORDS` in `app.py`).
   It's intentionally simple/fast — swap in an LLM call there later if you
-  want smarter detection on messier phone-camera OCR text.
-- **OCR** uses `pytesseract`. If `tesseract-ocr` isn't installed on the host,
-  the app degrades gracefully to manual text entry instead of crashing.
+  want smarter detection on messier inputs.
 - **Exports**: DOCX via `python-docx`, PDF via `reportlab`. Both are optional
   imports — if either package is missing, that download button is hidden
   with a note instead of breaking the app.
