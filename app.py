@@ -654,7 +654,11 @@ def push_history(question, topic, answer):
 # ============================================================
 st.sidebar.markdown("## 🧮 MathMate")
 st.sidebar.caption("Interactive Mathematics Lab")
-page = st.sidebar.radio("Navigate", ["🏠 Home", "✨ Solve", "📐 Formula Reference", "🎯 Practice & Quiz", "🕘 History"], label_visibility="collapsed")
+NAV_PAGES = ["🏠 Home", "✨ Solve", "📐 Formula Reference", "🎯 Practice & Quiz", "🕘 History"]
+if "nav_page" not in st.session_state:
+    st.session_state.nav_page = "🏠 Home"
+
+page = st.sidebar.radio("Navigate", NAV_PAGES, key="nav_page", label_visibility="collapsed")
 
 if "streak" not in st.session_state:
     st.session_state.streak = 0
