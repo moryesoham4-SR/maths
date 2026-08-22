@@ -652,10 +652,17 @@ def push_history(question, topic, answer):
 # ============================================================
 # SIDEBAR NAV
 # ============================================================
+def set_nav_page(target_page, preset_q=None):
+    st.session_state.nav_page = target_page
+    if preset_q:
+        st.session_state.preset_question = preset_q
+
 st.sidebar.markdown("## 🧮 MathMate")
 st.sidebar.caption("Interactive Mathematics Lab")
 NAV_PAGES = ["🏠 Home", "✨ Solve", "📐 Formula Reference", "🎯 Practice & Quiz", "🕘 History"]
-if "nav_page" not in st.session_state:
+if "redirect_page" in st.session_state:
+    st.session_state.nav_page = st.session_state.pop("redirect_page")
+elif "nav_page" not in st.session_state:
     st.session_state.nav_page = "🏠 Home"
 
 page = st.sidebar.radio("Navigate", NAV_PAGES, key="nav_page", label_visibility="collapsed")
@@ -693,6 +700,14 @@ if page == "🏠 Home":
     }
     
     cols = st.columns(3)
+    sample_qs = {
+        "gcd": "Find GCD of 1071 and 462",
+        "complex": "Convert z = 1 + 1.73205i to polar form",
+        "demoivre": "Find (1 + i)^4 using De Moivre's theorem",
+        "permcomb": "Find 5C2",
+        "functions": "Domain: 1, 2, 3. Codomain: a, b, c",
+        "limits": "lim x->0 sin(3*x)/x"
+    }
     for i, (key, (title, desc)) in enumerate(topic_descriptions.items()):
         with cols[i % 3]:
             st.markdown(f"""
@@ -701,18 +716,8 @@ if page == "🏠 Home":
                 <div style="font-size:0.88rem; color:rgba(247,245,239,0.8); line-height:1.4;">{desc}</div>
             </div>
             """, unsafe_allow_html=True)
-            if st.button(f"Solve {title.split()[0]} →", key=f"btn_home_{key}"):
-                sample_qs = {
-                    "gcd": "Find GCD of 1071 and 462",
-                    "complex": "Convert z = 1 + 1.73205i to polar form",
-                    "demoivre": "Find (1 + i)^4 using De Moivre's theorem",
-                    "permcomb": "Find 5C2",
-                    "functions": "Domain: 1, 2, 3. Codomain: a, b, c",
-                    "limits": "lim x->0 sin(3*x)/x"
-                }
-                st.session_state.preset_question = sample_qs[key]
-                st.session_state.nav_page = "✨ Solve"
-                st.rerun()
+            st.button(f"Solve {title.split()[0]} →", key=f"btn_home_{key}",
+                      on_click=set_nav_page, args=("✨ Solve", sample_qs[key]))
 
 
 # ============================================================
@@ -722,17 +727,15 @@ elif page == "✨ Solve":
     st.markdown('<div class="hero-title">✨ Interactive Solver</div>', unsafe_allow_html=True)
     st.caption("Paste any question or click a quick sample chip below:")
 
+    def set_preset(q_text):
+        st.session_state.preset_question = q_text
+
     chip_c1, chip_c2, chip_c3, chip_c4, chip_c5 = st.columns(5)
-    if chip_c1.button("💡 GCD: 1071 & 462"):
-        st.session_state.preset_question = "Find GCD of 1071 and 462"
-    if chip_c2.button("💡 Polar: 1 + 1.732i"):
-        st.session_state.preset_question = "Convert z = 1 + 1.73205i to polar form"
-    if chip_c3.button("💡 De Moivre: (1+i)⁴"):
-        st.session_state.preset_question = "Find (1 + i)^4 using De Moivre"
-    if chip_c4.button("💡 5C2"):
-        st.session_state.preset_question = "Find 5C2"
-    if chip_c5.button("💡 Limit: sin(3x)/x"):
-        st.session_state.preset_question = "lim x->0 sin(3*x)/x"
+    chip_c1.button("💡 GCD: 1071 & 462", on_click=set_preset, args=("Find GCD of 1071 and 462",))
+    chip_c2.button("💡 Polar: 1 + 1.732i", on_click=set_preset, args=("Convert z = 1 + 1.73205i to polar form",))
+    chip_c3.button("💡 De Moivre: (1+i)⁴", on_click=set_preset, args=("Find (1 + i)^4 using De Moivre",))
+    chip_c4.button("💡 5C2", on_click=set_preset, args=("Find 5C2",))
+    chip_c5.button("💡 Limit: sin(3x)/x", on_click=set_preset, args=("lim x->0 sin(3*x)/x",))
 
     initial_q = st.session_state.pop("preset_question", "")
     question_text = st.text_area("Enter your question", value=initial_q,
