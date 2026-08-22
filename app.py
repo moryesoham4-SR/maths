@@ -981,6 +981,7 @@ elif page in TOPIC_NAV_MAP.values():
     detected, parsed_params = parse_question(question_text) if question_text else (None, {})
     steps, answer, extra = None, None, {}
     auto_trigger = bool(question_text and (detected == topic_key or not detected))
+    domain_str, codomain_str, mapping = "1,2,3", "a,b,c,d", {}
 
     # Parameter inputs per topic
     if topic_key == "gcd":
@@ -1063,6 +1064,27 @@ elif page in TOPIC_NAV_MAP.values():
             except Exception as e:
                 st.error(f"Couldn't parse that expression: {e}")
 
+    # Save to session_state so downloads/reruns don't erase the solution
+    if steps:
+        st.session_state.active_solution = {
+            "topic_key": topic_key,
+            "question_text": question_text,
+            "steps": steps,
+            "answer": answer,
+            "extra": extra,
+            "domain_str": domain_str,
+            "codomain_str": codomain_str,
+            "mapping": mapping,
+        }
+    elif "active_solution" in st.session_state and st.session_state.active_solution.get("topic_key") == topic_key:
+        saved = st.session_state.active_solution
+        steps = saved.get("steps")
+        answer = saved.get("answer")
+        extra = saved.get("extra")
+        domain_str = saved.get("domain_str", domain_str)
+        codomain_str = saved.get("codomain_str", codomain_str)
+        mapping = saved.get("mapping", mapping)
+
     # Render Split 2-Column Layout when steps exist
     if steps:
         st.markdown("---")
@@ -1099,22 +1121,38 @@ elif page in TOPIC_NAV_MAP.values():
             # Save / Export Actions
             st.markdown("### 💾 Save & Export Solution")
             e1, e2, e3, e4 = st.columns(4)
+            
             with e1:
-                st.button("📋 Copy Answer", on_click=lambda: None, help="Answer displayed on right panel.")
+                if st.button("📋 Copy Answer", key="btn_copy_ans_act"):
+                    st.session_state.show_copy_box = True
+                    st.toast(f"📋 Answer '{answer}' ready to copy!")
             with e2:
                 if DOCX_AVAILABLE:
                     buf = build_docx(question_text or TOPICS[topic_key], TOPICS[topic_key], steps, answer)
-                    st.download_button("📄 DOCX Export", buf, file_name="mathmate_solution.docx")
+                    st.download_button("📄 DOCX Export", buf, file_name="mathmate_solution.docx", key="dl_docx_btn")
                 else:
                     st.caption("Install `python-docx` for DOCX.")
             with e3:
                 if REPORTLAB_AVAILABLE:
                     buf = build_pdf(question_text or TOPICS[topic_key], TOPICS[topic_key], steps, answer)
-                    st.download_button("📥 PDF Export", buf, file_name="mathmate_solution.pdf")
+                    st.download_button("📥 PDF Export", buf, file_name="mathmate_solution.pdf", key="dl_pdf_btn")
                 else:
                     st.caption("Install `reportlab` for PDF.")
             with e4:
-                st.button("🔗 Share Solution", help="Copy shareable solution link.")
+                if st.button("🔗 Share Solution", key="btn_share_sol_act"):
+                    st.session_state.show_share_box = True
+                    st.toast("🔗 Shareable link generated!")
+
+            # Copy box callout
+            if st.session_state.get("show_copy_box"):
+                st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#2EC4B6; margin-top:8px;'>📋 COPYABLE FINAL ANSWER:</div>", unsafe_allow_html=True)
+                st.code(answer, language=None)
+
+            # Share box callout
+            if st.session_state.get("show_share_box"):
+                clean_q = (question_text or f"{TOPICS[topic_key]} problem").replace(" ", "+")
+                share_url = f"https://mathmate.streamlit.app/?topic={topic_key}&q={clean_q}"
+                st.info(f"🔗 **Shareable Solution Link:**\n\n`{share_url}`\n\n*(Copy and paste this link to share your solution with others)*")
 
         with info_col:
             render_answer_card(answer)
@@ -1213,7 +1251,7 @@ elif page == "📜 Solution History":
             <div class="glass-card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                     <span style="font-weight:700; color:#2EC4B6; font-size:0.95rem;">{item['topic']}</span>
-                    <span style="font-size:0.8rem; color:rgba(247,245,239,0.5);">{item['time']}</span>
+                    <span style="font-size:0.88rem; color:rgba(247,245,239,0.5);">{item['time']}</span>
                 </div>
                 <div style="font-size:1.05rem; font-weight:600; color:#FFFFFF; margin-bottom:6px;">{item['question']}</div>
                 <div style="font-size:0.9rem; color:#FFB627; font-weight:700;">Answer: {item['answer']}</div>
