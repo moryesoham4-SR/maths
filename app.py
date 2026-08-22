@@ -870,6 +870,19 @@ NAV_PAGES = [
     "📜 Solution History"
 ]
 
+# Parse query parameters for shared links (e.g. ?topic=gcd&q=Find+GCD+of+1071+and+462)
+try:
+    q_params = st.query_params
+    if "topic" in q_params and "q" in q_params and "share_handled" not in st.session_state:
+        st.session_state.share_handled = True
+        t_param = q_params["topic"]
+        q_text_param = q_params["q"]
+        if t_param in TOPIC_NAV_MAP:
+            st.session_state.nav_page = TOPIC_NAV_MAP[t_param]
+            st.session_state.preset_question = q_text_param
+except Exception:
+    pass
+
 if "redirect_page" in st.session_state:
     st.session_state.nav_page = st.session_state.pop("redirect_page")
 elif "nav_page" not in st.session_state:
