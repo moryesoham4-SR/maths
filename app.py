@@ -497,8 +497,8 @@ def plot_complex_plane(points: list, labels: list, colors: list = None, draw_pol
     colors = colors or [TEAL, AMBER, CORAL, "#9B5DE5", "#00B4D8", "#F72585"]
     max_r = max([abs(complex(*p)) for p in points] + [1]) * 1.35
     
-    ax.axhline(0, color="rgba(247,245,239,0.25)", alpha=0.3, linewidth=1)
-    ax.axvline(0, color="rgba(247,245,239,0.25)", alpha=0.3, linewidth=1)
+    ax.axhline(0, color=PAPER, alpha=0.25, linewidth=1)
+    ax.axvline(0, color=PAPER, alpha=0.25, linewidth=1)
     ax.grid(True, color="#1c2d42", linestyle=":", linewidth=0.8, alpha=0.6)
 
     r_val = abs(complex(*points[0]))
@@ -540,8 +540,8 @@ def plot_function_diagram(domain, codomain, mapping):
     dom_pos = {d: (0.15, y) for d, y in zip(domain, y_dom)}
     cod_pos = {c: (0.75, y) for c, y in zip(codomain, y_cod)}
     
-    ax.add_patch(plt.Circle((0.15, 0.5), 0.42, color="rgba(46,196,182,0.08)", fill=True, ec=TEAL, ls="--", lw=1.2))
-    ax.add_patch(plt.Circle((0.75, 0.5), 0.42, color="rgba(255,182,39,0.08)", fill=True, ec=AMBER, ls="--", lw=1.2))
+    ax.add_patch(plt.Circle((0.15, 0.5), 0.42, color=TEAL, alpha=0.08, fill=True, ec=TEAL, ls="--", lw=1.2))
+    ax.add_patch(plt.Circle((0.75, 0.5), 0.42, color=AMBER, alpha=0.08, fill=True, ec=AMBER, ls="--", lw=1.2))
 
     for d, (x, y) in dom_pos.items():
         ax.scatter([x], [y], color=TEAL, s=280, zorder=5, edgecolors="#ffffff", lw=1)
