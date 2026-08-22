@@ -1,0 +1,32 @@
+"""
+API Client module for MathMate.
+Safely retrieves API keys from Streamlit secrets or environment variables.
+"""
+
+import os
+import streamlit as st
+
+def get_api_key():
+    """Safely fetch NVIDIA_API_KEY from st.secrets or os.environ without raising KeyError."""
+    try:
+        if hasattr(st, "secrets") and "NVIDIA_API_KEY" in st.secrets:
+            return st.secrets["NVIDIA_API_KEY"]
+    except Exception:
+        pass
+    return os.environ.get("NVIDIA_API_KEY", None)
+
+
+def setup_client():
+    """Sets up API client safely, returning None if key is missing instead of crashing."""
+    api_key = get_api_key()
+    if not api_key:
+        return None
+    
+    try:
+        from openai import OpenAI
+        return OpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=api_key
+        )
+    except Exception:
+        return None
