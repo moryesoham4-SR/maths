@@ -222,7 +222,7 @@ h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {{
     background: linear-gradient(135deg, rgba(46, 196, 182, 0.15) 0%, rgba(255, 182, 39, 0.1) 100%);
     border: 2px solid {TEAL};
     border-radius: 16px;
-    padding: 24px;
+    padding: 20px;
     text-align: center;
     box-shadow: 0 8px 30px rgba(46, 196, 182, 0.25);
     margin-bottom: 20px;
@@ -238,7 +238,7 @@ h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {{
 }}
 
 .answer-value {{
-    font-size: 1.5rem;
+    font-size: 1.4rem;
     font-weight: 800;
     color: #FFFFFF;
     margin-bottom: 8px;
@@ -442,8 +442,8 @@ TOPIC_CONCEPTS = {
 # ============================================================
 # HELPER PARSERS & STRING FORMATTERS
 # ============================================================
-def format_prime_factorization(factor_dict: dict) -> str:
-    """Format prime factorization dictionary {p: e} into LaTeX string like 2^3 × 3^2 × 5^1."""
+def format_prime_factorization_latex(factor_dict: dict) -> str:
+    """Format prime factorization dictionary {p: e} into LaTeX string like 2^{3} \\times 3^{2}."""
     if not factor_dict:
         return "1"
     parts = []
@@ -453,8 +453,20 @@ def format_prime_factorization(factor_dict: dict) -> str:
     return r" \times ".join(parts)
 
 
+def format_prime_factorization_plain(factor_dict: dict) -> str:
+    """Format prime factorization dictionary {p: e} into plain readable text like 2³ × 3²."""
+    if not factor_dict:
+        return "1"
+    superscripts = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'}
+    parts = []
+    for p in sorted(factor_dict.keys()):
+        e = factor_dict[p]
+        e_str = "".join(superscripts.get(ch, ch) for ch in str(e))
+        parts.append(f"{p}{e_str}")
+    return " × ".join(parts)
+
+
 def detect_topic(text: str) -> str:
-    """Keyword-based topic classifier with a scoring fallback."""
     t = text.lower()
     scores = {k: 0 for k in TOPICS}
     for topic, kws in TOPIC_KEYWORDS.items():
@@ -487,13 +499,13 @@ def extract_complex_parts(text: str):
         b_str = m.group(2).replace(" ", "")
         b = 1.0 if b_str in ["+", ""] else -1.0 if b_str == "-" else float(b_str)
         return a, b
-    
+
     m_pure_im = re.search(r"([+-]?\d*\.?\d*)[ij]", t, re.IGNORECASE)
     if m_pure_im and not re.search(r"[+-]\d", t):
         val = m_pure_im.group(1)
         b = 1.0 if val in ["", "+"] else -1.0 if val == "-" else float(val)
         return 0.0, b
-    
+
     m_real = re.search(r"([+-]?\d+\.?\d*)", t)
     if m_real:
         return float(m_real.group(1)), 0.0
@@ -539,28 +551,28 @@ def solve_divisibility(n: int):
     steps = []
     steps.append(("Input Specification", f"Analyze integer n = {n}"))
 
-    # Prime Test
     is_prime = sp.isprime(n)
     steps.append(("Primality Test", f"Is {n} prime? {'YES (Prime)' if is_prime else 'NO (Composite)'}"))
 
-    # Prime Factorization
     factors = factorint(n)
-    fact_str = format_prime_factorization(factors)
-    steps.append(("Prime Factorization", f"{n} = {fact_str}"))
+    fact_plain = format_prime_factorization_plain(factors)
+    fact_latex = format_prime_factorization_latex(factors)
+    steps.append(("Prime Factorization", f"Factorization: {n} = {fact_plain}"))
 
-    # List of Divisors
     divisors = sorted(sp.divisors(n))
     tau = len(divisors)
     sigma = sum(divisors)
 
-    steps.append(("Divisor Enumeration", f"Divisors of {n}: {divisors}\n"
-                                         f"Total Number of Divisors τ({n}) = {tau}\n"
-                                         f"Sum of Divisors σ({n}) = {sigma}"))
+    steps.append(("Divisor Enumeration & Counting Functions",
+                  f"Divisors of {n}: {divisors}\n"
+                  f"Total Number of Divisors τ({n}) = {tau}\n"
+                  f"Sum of Divisors σ({n}) = {sigma}"))
 
-    ans_summary = f"{n} = {fact_str} | Divisors: {tau} | Prime: {is_prime}"
-    return steps, ans_summary, {
+    ans_latex = fr"\text{{gcd factor for }} {n} = {fact_latex} \implies \tau({n}) = {tau}, \ \sigma({n}) = {sigma}"
+    return steps, ans_latex, {
         "n": n, "is_prime": is_prime, "factors": factors,
-        "divisors": divisors, "tau": tau, "sigma": sigma
+        "divisors": divisors, "tau": tau, "sigma": sigma,
+        "fact_plain": fact_plain, "fact_latex": fact_latex
     }
 
 
@@ -574,7 +586,6 @@ def solve_gcd_factorization(a: int, b: int):
     steps = []
     steps.append(("Input Integers", f"Compute gcd({orig_a}, {orig_b})"))
 
-    # 1. Euclidean Algorithm Breakdown
     u, v = a_abs, b_abs
     if u < v:
         steps.append(("Ordering Adjustment", f"Swap inputs so larger integer is first: a = {v}, b = {u}"))
@@ -594,11 +605,9 @@ def solve_gcd_factorization(a: int, b: int):
     steps.append(("Euclidean Algorithm Division Steps", "\n".join(euclid_steps)))
     steps.append(("Euclidean GCD Result", f"The last non-zero remainder is {gcd_val}. Thus, gcd({orig_a}, {orig_b}) = {gcd_val}."))
 
-    # 2. Bézout's Identity via Extended Euclidean Algorithm
     g, x_bez, y_bez = gcdex(a_abs, b_abs)
     steps.append(("Bézout's Identity (Extended Euclidean)", f"Linear combination: ({x_bez}) × {a_abs} + ({y_bez}) × {b_abs} = {gcd_val}"))
 
-    # 3. Prime Factorization Form
     fact_a = factorint(a_abs)
     fact_b = factorint(b_abs)
 
@@ -617,29 +626,34 @@ def solve_gcd_factorization(a: int, b: int):
         fact_lcm[p] = max_e
         comp_lines.append(f"• Prime {p}: e_a={e_a}, e_b={e_b} → min(e_a, e_b) = {min_e}, max(e_a, e_b) = {max_e}")
 
-    str_fact_a = format_prime_factorization(fact_a)
-    str_fact_b = format_prime_factorization(fact_b)
-    str_fact_gcd = format_prime_factorization(fact_gcd)
-    str_fact_lcm = format_prime_factorization(fact_lcm)
+    plain_fact_a = format_prime_factorization_plain(fact_a)
+    plain_fact_b = format_prime_factorization_plain(fact_b)
+    plain_fact_gcd = format_prime_factorization_plain(fact_gcd)
+    plain_fact_lcm = format_prime_factorization_plain(fact_lcm)
+
+    latex_fact_gcd = format_prime_factorization_latex(fact_gcd)
+    latex_fact_lcm = format_prime_factorization_latex(fact_lcm)
+
     lcm_val = math.lcm(a_abs, b_abs)
 
     fact_block = (
-        f"Prime Factorization of a = {a_abs}:  {a_abs} = {str_fact_a}\n"
-        f"Prime Factorization of b = {b_abs}:  {b_abs} = {str_fact_b}\n\n"
+        f"Prime Factorization of a = {a_abs}:  {plain_fact_a}\n"
+        f"Prime Factorization of b = {b_abs}:  {plain_fact_b}\n\n"
         f"Exponent Comparison across Primes:\n" + "\n".join(comp_lines) + "\n\n"
         f"GCD in Factorization Form:\n"
-        f"gcd({a_abs}, {b_abs}) = {str_fact_gcd} = {gcd_val}\n\n"
+        f"gcd({a_abs}, {b_abs}) = {plain_fact_gcd} = {gcd_val}\n\n"
         f"LCM in Factorization Form:\n"
-        f"lcm({a_abs}, {b_abs}) = {str_fact_lcm} = {lcm_val}"
+        f"lcm({a_abs}, {b_abs}) = {plain_fact_lcm} = {lcm_val}"
     )
 
     steps.append(("GCD & LCM in Prime Factorization Form", fact_block))
 
-    ans_str = f"gcd({orig_a}, {orig_b}) = {str_fact_gcd} = {gcd_val}"
-    return steps, ans_str, {
+    ans_latex = fr"\gcd({orig_a}, {orig_b}) = {latex_fact_gcd} = {gcd_val}"
+    return steps, ans_latex, {
         "gcd": gcd_val, "lcm": lcm_val, "a": a_abs, "b": b_abs,
         "fact_a": fact_a, "fact_b": fact_b, "fact_gcd": fact_gcd, "fact_lcm": fact_lcm,
-        "x_bez": x_bez, "y_bez": y_bez, "all_primes": all_primes
+        "x_bez": x_bez, "y_bez": y_bez, "all_primes": all_primes,
+        "plain_fact_gcd": plain_fact_gcd, "latex_fact_gcd": latex_fact_gcd
     }
 
 
@@ -653,22 +667,19 @@ def solve_linear_congruence(a: int, b: int, m: int):
     b_mod = b % m
     steps.append(("Linear Congruence Formulation", f"Solve: {a}x ≡ {b} (mod {m})  →  Simplified: {a_mod}x ≡ {b_mod} (mod {m})"))
 
-    # Step 1: Compute d = gcd(a, m)
     d = math.gcd(a_mod, m)
     steps.append(("GCD Check d = gcd(a, m)", f"d = gcd({a_mod}, {m}) = {d}"))
 
-    # Step 2: Solvability Condition Check
     if b_mod % d != 0:
         fail_msg = (f"Solvability Condition FAILED!\n"
                     f"d = {d} does NOT divide b = {b_mod} (remainder {b_mod % d}).\n"
                     f"Conclusion: NO SOLUTION exists for {a}x ≡ {b} (mod {m}).")
         steps.append(("Solvability Analysis", fail_msg))
-        return steps, "No Solution", {"solvable": False, "d": d, "solutions": []}
+        return steps, r"\text{No Solution } (\gcd(a,m) \nmid b)", {"solvable": False, "d": d, "solutions": []}
 
-    steps.append(("Solvability Analysis", f"PASSED! d = {d} divides b = {b_mod} ({b_mod} / {d} = {b_mod // d}).\n"
+    steps.append(("Solvability Analysis", f"PASSED! d = {d} divides b = {b_mod}.\n"
                                          f"Conclusion: Exactly {d} incongruent solution(s) exist modulo {m}."))
 
-    # Step 3: Reduce equation by dividing through by d
     a_prime = a_mod // d
     b_prime = b_mod // d
     m_prime = m // d
@@ -676,24 +687,22 @@ def solve_linear_congruence(a: int, b: int, m: int):
     steps.append(("Equation Reduction by d", f"Dividing by d = {d}:\n"
                                             f"({a_mod}/{d})x ≡ ({b_mod}/{d}) (mod {m}/{d})  →  {a_prime}x ≡ {b_prime} (mod {m_prime})"))
 
-    # Step 4: Find Modular Inverse of a' mod m'
     inv_a = mod_inverse(a_prime, m_prime)
     x0 = (inv_a * b_prime) % m_prime
 
     steps.append(("Modular Inverse & Base Solution", f"Modular Inverse: ({a_prime})⁻¹ ≡ {inv_a} (mod {m_prime})\n"
                                                      f"Particular Base Solution: x₀ ≡ ({inv_a} × {b_prime}) mod {m_prime} = {x0}"))
 
-    # Step 5: Generate all d incongruent solutions modulo m
     solutions = [(x0 + k * m_prime) % m for k in range(d)]
     sol_str = ", ".join(str(s) for s in solutions)
-    sol_latex = r", \quad ".join(f"x \equiv {s} \pmod{{{m}}}" for s in solutions)
+    sol_latex = r" \quad \text{or} \quad ".join(f"x \equiv {s} \pmod{{{m}}}" for s in solutions)
 
     steps.append(("All Incongruent Solutions Modulo m", f"Formula: xₖ = x₀ + k · (m/d)  for k = 0, 1, ..., {d-1}\n"
                                                        f"Generated Solutions mod {m}:\n"
-                                                       f"{sol_latex}"))
+                                                       f"x ≡ {sol_str} (mod {m})"))
 
-    ans_summary = f"x ≡ {sol_str} (mod {m})"
-    return steps, ans_summary, {
+    ans_latex = sol_latex
+    return steps, ans_latex, {
         "solvable": True, "d": d, "a": a, "b": b, "m": m,
         "a_prime": a_prime, "b_prime": b_prime, "m_prime": m_prime,
         "x0": x0, "solutions": solutions
@@ -710,10 +719,12 @@ def solve_complex_to_polar(a: float, b: float):
     theta_deg = math.degrees(theta_rad)
     quadrant = "Quadrant I" if a >= 0 and b >= 0 else "Quadrant II" if a < 0 and b >= 0 else "Quadrant III" if a < 0 and b < 0 else "Quadrant IV"
     steps.append(("Compute Argument (θ)", f"θ = atan2(b, a) = atan2({b}, {a}) = {theta_rad:.4f} rad ({theta_deg:.2f}°)\nLocated in {quadrant}"))
-    polar_str = f"{r:.4f} (cos({theta_deg:.2f}°) + i sin({theta_deg:.2f}°))"
-    euler_str = f"{r:.4f} e^({theta_rad:.4f}i)"
-    steps.append(("Polar & Exponential Forms", f"Polar Form: z = {polar_str}\nExponential Form: z = {euler_str}"))
-    return steps, polar_str, {"r": r, "theta_rad": theta_rad, "theta_deg": theta_deg, "a": a, "b": b}
+
+    polar_latex = fr"z = {r:.4f} \left(\cos({theta_deg:.2f}^\circ) + i \sin({theta_deg:.2f}^\circ)\right)"
+    euler_latex = fr"z = {r:.4f} e^{{{theta_rad:.4f}i}}"
+
+    steps.append(("Polar & Exponential Forms", f"Polar Form: z = {r:.4f}(cos({theta_deg:.2f}°) + i sin({theta_deg:.2f}°))\nExponential Form: z = {r:.4f} e^({theta_rad:.4f}i)"))
+    return steps, polar_latex, {"r": r, "theta_rad": theta_rad, "theta_deg": theta_deg, "a": a, "b": b, "euler": euler_latex}
 
 
 def solve_perm(n: int, r: int):
@@ -737,7 +748,8 @@ def solve_perm(n: int, r: int):
                   f"• Circular Permutations of {n} objects around a table: ({n}-1)! = {val_circ}")
     steps.append(("Special Permutation Scenarios", extra_info))
 
-    return steps, str(val_npr), {"val": val_npr, "n": n, "r": r, "n_fact": val_fact, "circular": val_circ}
+    ans_latex = fr"P({n}, {r}) = {val_npr}"
+    return steps, ans_latex, {"val": val_npr, "n": n, "r": r, "n_fact": val_fact, "circular": val_circ}
 
 
 def solve_comb(n: int, r: int):
@@ -757,7 +769,8 @@ def solve_comb(n: int, r: int):
     comp_r = n - r
     steps.append(("Symmetry Property", f"C({n}, {r}) = C({n}, {comp_r}) = {val_ncr}"))
 
-    return steps, str(val_ncr), {"val": val_ncr, "n": n, "r": r}
+    ans_latex = fr"\binom{{{n}}}{{{r}}} = C({n}, {r}) = {val_ncr}"
+    return steps, ans_latex, {"val": val_ncr, "n": n, "r": r}
 
 
 def solve_functions(domain: list, codomain: list, mapping: dict):
@@ -770,19 +783,19 @@ def solve_functions(domain: list, codomain: list, mapping: dict):
     mapped_values = list(mapping.values())
     is_injective = len(mapped_values) == len(set(mapped_values))
     if is_injective:
-        steps.append(("Injectivity Test (One-to-One)", "PASSED: All outputs are distinct. No two domain elements share an image. Function is INJECTIVE."))
+        steps.append(("Injectivity Test (One-to-One)", "PASSED: All outputs are distinct. Function is INJECTIVE."))
     else:
         duplicates = [x for x in set(mapped_values) if mapped_values.count(x) > 1]
-        steps.append(("Injectivity Test (One-to-One)", f"FAILED: Multiple domain inputs map to the same codomain element(s): {duplicates}. Function is NOT Injective."))
+        steps.append(("Injectivity Test (One-to-One)", f"FAILED: Multiple domain inputs map to same codomain element(s): {duplicates}. NOT Injective."))
 
     range_set = set(mapped_values)
     codomain_set = set(codomain)
     is_surjective = range_set == codomain_set
     if is_surjective:
-        steps.append(("Surjectivity Test (Onto)", "PASSED: Range equals Codomain. Every element in Codomain B has a pre-image in Domain A. Function is SURJECTIVE."))
+        steps.append(("Surjectivity Test (Onto)", "PASSED: Range equals Codomain. Function is SURJECTIVE."))
     else:
         uncovered = list(codomain_set - range_set)
-        steps.append(("Surjectivity Test (Onto)", f"FAILED: Uncovered codomain element(s) with no pre-image: {uncovered}. Function is NOT Surjective."))
+        steps.append(("Surjectivity Test (Onto)", f"FAILED: Uncovered element(s): {uncovered}. NOT Surjective."))
 
     is_bijective = is_injective and is_surjective
     classification = "BIJECTIVE (Injective & Surjective)" if is_bijective else \
@@ -791,7 +804,8 @@ def solve_functions(domain: list, codomain: list, mapping: dict):
                      "NEITHER (Neither Injective nor Surjective)"
 
     steps.append(("Final Classification", f"Classification: {classification}"))
-    return steps, classification, {"injective": is_injective, "surjective": is_surjective, "bijective": is_bijective}
+    ans_latex = fr"\text{{{classification}}}"
+    return steps, ans_latex, {"injective": is_injective, "surjective": is_surjective, "bijective": is_bijective, "classification": classification}
 
 
 def solve_inverse_image(domain: list, codomain: list, mapping: dict, target_set: list):
@@ -811,14 +825,16 @@ def solve_inverse_image(domain: list, codomain: list, mapping: dict, target_set:
     unique_preimages = sorted(list(set(pre_images)))
     steps.append(("Element-by-Element Pre-image Lookup", "\n".join(element_breakdown)))
 
-    ans_str = f"f⁻¹({{{', '.join(target_set_clean)}}}) = {{{', '.join(unique_preimages) if unique_preimages else 'Ø'}}}"
-    steps.append(("Inverse Image Set Result", f"f⁻¹(S) = {{ x ∈ A | f(x) ∈ S }} = {ans_str}"))
+    pre_str = ', '.join(unique_preimages) if unique_preimages else r'\emptyset'
+    target_str = ', '.join(target_set_clean)
+    ans_latex = fr"f^{{-1}}\left(\{{{target_str}\}}\right) = \{{{pre_str}\}}"
 
-    return steps, ans_str, {"preimages": unique_preimages, "target_set": target_set_clean}
+    steps.append(("Inverse Image Set Result", f"f⁻¹(S) = {{ x ∈ A | f(x) ∈ S }} = {{{pre_str}}}"))
+    return steps, ans_latex, {"preimages": unique_preimages, "target_set": target_set_clean}
 
 
 # ============================================================
-# INTERACTIVE PLOTLY VISUALIZATIONS
+# RICH MATHEMATICAL VISUALIZATIONS (PLOTLY ENGINES)
 # ============================================================
 
 def plot_factor_breakdown_plotly(fact_a: dict, fact_b: dict, fact_gcd: dict, a_val: int, b_val: int):
@@ -852,18 +868,41 @@ def plot_factor_breakdown_plotly(fact_a: dict, fact_b: dict, fact_gcd: dict, a_v
     return fig
 
 
+def plot_divisors_plotly(n: int, divisors: list):
+    """Visual bar graph of all divisors of integer n with factor pairs."""
+    fig = go.Figure()
+    pairs = [f"{d} × {n//d}" for d in divisors]
+
+    fig.add_trace(go.Bar(
+        x=[str(d) for d in divisors],
+        y=divisors,
+        marker=dict(color=divisors, colorscale='Viridis'),
+        hovertext=[f"Divisor: {d}<br>Complement: {n//d}<br>Pair: {p}" for d, p in zip(divisors, pairs)],
+        hovertemplate="<b>%{hovertext}</b><extra></extra>"
+    ))
+
+    fig.update_layout(
+        title=f"<b>Positive Divisors Breakdown for n = {n} (Total τ({n}) = {len(divisors)})</b>",
+        xaxis=dict(title="Divisors d", gridcolor="rgba(255,255,255,0.05)"),
+        yaxis=dict(title="Divisor Value", gridcolor="rgba(255,255,255,0.05)"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(10,18,38,0.6)",
+        font=dict(color="#FFFFFF", family="Outfit"),
+        margin=dict(l=20, r=20, t=40, b=20),
+        height=380
+    )
+    return fig
+
+
 def plot_congruence_clock_plotly(m: int, solutions: list):
     """Modular clock / circle visualization for linear congruences ax ≡ b (mod m)."""
     fig = go.Figure()
-
-    # Draw modular circle
     angles = np.linspace(0, 2*np.pi, m, endpoint=False)
     angles = (np.pi/2 - angles) % (2*np.pi)
     r = 1.0
 
     x_nodes = r * np.cos(angles)
     y_nodes = r * np.sin(angles)
-
     sol_set = set(solutions)
 
     t_smooth = np.linspace(0, 2*np.pi, 200)
@@ -957,6 +996,75 @@ def plot_complex_plane_plotly(points: list, labels: list, colors: list = None):
         margin=dict(l=20, r=20, t=30, b=20),
         showlegend=False,
         height=420
+    )
+    return fig
+
+
+def plot_perm_comb_plotly(n: int, r: int, val_npr: int, val_ncr: int):
+    """Bar chart comparing arrangement types: n!, P(n,r), C(n,r), (n-1)!."""
+    val_fact = math.factorial(n)
+    val_circ = math.factorial(n - 1) if n >= 1 else 0
+
+    categories = [f"Full Row n! ({n}!)", f"Permutations P({n},{r})", f"Combinations C({n},{r})", f"Circular ({n}-1)!"]
+    values = [val_fact, val_npr, val_ncr, val_circ]
+    colors = [CORAL, TEAL, AMBER, GRAPHITE]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=categories, y=values,
+        marker_color=colors,
+        text=[str(v) for v in values],
+        textposition="auto"
+    ))
+
+    fig.update_layout(
+        title=f"<b>Counting Analysis Comparison (n = {n}, r = {r})</b>",
+        xaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
+        yaxis=dict(title="Count / Possibilities", type="log" if max(values) > 1000 else "linear", gridcolor="rgba(255,255,255,0.05)"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(10,18,38,0.6)",
+        font=dict(color="#FFFFFF", family="Outfit"),
+        margin=dict(l=20, r=20, t=40, b=20),
+        height=380
+    )
+    return fig
+
+
+def plot_pascals_triangle_plotly(n: int, r: int):
+    """Interactive Pascal's Triangle heatmap highlighting position C(n, r)."""
+    max_row = max(n + 1, 6)
+    matrix = np.zeros((max_row, max_row))
+
+    for i in range(max_row):
+        for j in range(i + 1):
+            matrix[i, j] = math.comb(i, j)
+
+    fig = go.Figure()
+    fig.add_trace(go.Heatmap(
+        z=matrix,
+        colorscale='Viridis',
+        showscale=False,
+        hoverongaps=False
+    ))
+
+    # Highlight selected C(n, r) point
+    fig.add_trace(go.Scatter(
+        x=[r], y=[n],
+        mode='markers+text',
+        marker=dict(size=24, color=AMBER, line=dict(width=3, color='#FFFFFF')),
+        text=[f"C({n},{r})={math.comb(n,r)}"], textposition="top center",
+        textfont=dict(color="#FFFFFF", weight="bold")
+    ))
+
+    fig.update_layout(
+        title=f"<b>Pascal's Triangle Binomial Grid — Highlighting C({n}, {r}) = {math.comb(n,r)}</b>",
+        xaxis=dict(title="Column r", dtick=1, gridcolor="rgba(255,255,255,0.05)"),
+        yaxis=dict(title="Row n", dtick=1, autorange="reversed", gridcolor="rgba(255,255,255,0.05)"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(10,18,38,0.6)",
+        font=dict(color="#FFFFFF", family="Outfit"),
+        margin=dict(l=20, r=20, t=40, b=20),
+        height=380
     )
     return fig
 
@@ -1057,7 +1165,7 @@ def generate_procedural_question(topic_key: str = None):
             "topic": "divisibility",
             "options": opts,
             "answer": correct,
-            "exp": f"Prime factorization of {n}: {format_prime_factorization(extra['factors'])}\nτ({n}) = {extra['tau']}."
+            "exp": f"Prime factorization of {n}: {extra['fact_plain']}\nτ({n}) = {extra['tau']}."
         }
 
     elif topic_key == "gcd":
@@ -1202,10 +1310,12 @@ def render_answer_card(answer):
     st.markdown(f"""
     <div class="answer-card">
         <div class="answer-badge">FINAL ANSWER</div>
-        <div class="answer-value">{answer}</div>
-        <div class="answer-status">✓ Computed & Verified</div>
-    </div>
     """, unsafe_allow_html=True)
+    if any(ch in answer for ch in ['\\', '^', '{', '}']):
+        st.latex(answer)
+    else:
+        st.markdown(f'<div class="answer-value">{answer}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="answer-status" style="font-size:0.8rem; color:#2EC4B6; margin-top:6px;">✓ Computed & Verified</div></div>', unsafe_allow_html=True)
 
 
 def set_nav_page(target_page, preset_q=None):
@@ -1482,7 +1592,7 @@ elif page in TOPIC_NAV_MAP.values():
                 answer = ai_res.get("answer", "")
                 st.success("Solved via AI Math Engine!")
 
-    # Render solution & Plotly charts
+    # Render solution & Rich Mathematical Visualizations
     if steps:
         st.markdown("---")
         sol_col, info_col = st.columns([7, 5])
@@ -1495,11 +1605,20 @@ elif page in TOPIC_NAV_MAP.values():
             if topic_key == "gcd":
                 fig = plot_factor_breakdown_plotly(extra["fact_a"], extra["fact_b"], extra["fact_gcd"], extra["a"], extra["b"])
                 st.plotly_chart(fig, use_container_width=True)
+            elif topic_key == "divisibility":
+                fig = plot_divisors_plotly(extra["n"], extra["divisors"])
+                st.plotly_chart(fig, use_container_width=True)
             elif topic_key == "congruence" and extra.get("solvable"):
                 fig = plot_congruence_clock_plotly(extra["m"], extra["solutions"])
                 st.plotly_chart(fig, use_container_width=True)
             elif topic_key == "complex":
                 fig = plot_complex_plane_plotly([(extra["a"], extra["b"])], ["z"])
+                st.plotly_chart(fig, use_container_width=True)
+            elif topic_key == "perm":
+                fig = plot_perm_comb_plotly(extra["n"], extra["r"], extra["val"], math.comb(extra["n"], extra["r"]))
+                st.plotly_chart(fig, use_container_width=True)
+            elif topic_key == "comb":
+                fig = plot_pascals_triangle_plotly(extra["n"], extra["r"])
                 st.plotly_chart(fig, use_container_width=True)
             elif topic_key in ["functions", "inverse_image"]:
                 fig = plot_function_diagram_plotly(
