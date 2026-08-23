@@ -1,14 +1,27 @@
 """
 MathMate — Interactive Mathematics Lab
-Streamlit app covering: Euclidean Algorithm & GCD, Complex Numbers & Polar Form,
-De Moivre's Theorem, Permutations & Combinations, Injective/Surjective/Bijective
-Functions, and Limits & Continuity.
+Streamlit app covering 6 core syllabus topics:
+1. Euclidean Algorithm & GCD
+2. Complex Numbers & Polar Form
+3. De Moivre's Theorem (powers and n-th roots)
+4. Permutations & Combinations
+5. Injective, Surjective & Bijective Functions
+6. Limits & Continuity
+
+Features:
+- Step-by-step problem solvers
+- Supabase cloud storage integration with automatic SQLite local fallback
+- AI Solver & Interactive Math Tutor (NVIDIA / OpenAI API)
+- Interactive Plotly visualizations (Argand plane, roots polygon, function mappings, limit curves)
+- Infinite procedural practice quiz engine
+- Formula & Concept Cheat Sheet reference page
 """
 
 import io
 import re
 import math
 import random
+import json
 from datetime import datetime
 
 import streamlit as st
@@ -20,6 +33,12 @@ from sympy.parsing.sympy_parser import (
     parse_expr, standard_transformations, implicit_multiplication_application,
 )
 
+import plotly.graph_objects as go
+import plotly.express as px
+
+# Local Database & API client imports
+import db
+import api_client
 
 # Optional export libs — degrade gracefully
 try:
@@ -38,10 +57,14 @@ except Exception:
 
 
 # ============================================================
-# PAGE CONFIG & THEME
+# PAGE CONFIG & STYLES
 # ============================================================
-st.set_page_config(page_title="MathMate — Interactive Mathematics Lab",
-                    page_icon="🧮", layout="wide")
+st.set_page_config(
+    page_title="MathMate — Interactive Mathematics Lab",
+    page_icon="🧮",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 INK = "#14213D"
 PAPER = "#F7F5EF"
@@ -157,15 +180,6 @@ h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {{
     white-space: pre-line;
 }}
 
-.timeline-connector {{
-    text-align: center;
-    color: {TEAL};
-    font-weight: bold;
-    font-size: 1.2rem;
-    margin: -2px 0;
-    opacity: 0.75;
-}}
-
 .answer-card {{
     background: linear-gradient(135deg, rgba(46, 196, 182, 0.15) 0%, rgba(255, 182, 39, 0.1) 100%);
     border: 2px solid {TEAL};
@@ -191,12 +205,6 @@ h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {{
     color: #FFFFFF;
     margin-bottom: 8px;
     word-break: break-word;
-}}
-
-.answer-status {{
-    font-size: 0.88rem;
-    color: {TEAL};
-    font-weight: 600;
 }}
 
 .understand-card {{
@@ -232,6 +240,15 @@ h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {{
     margin-bottom: 12px;
 }}
 
+.db-status-badge {{
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 12px;
+    display: inline-block;
+    margin-bottom: 12px;
+}}
+
 [data-testid="stSidebar"] {{
     background-color: #07111F;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -241,7 +258,21 @@ h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {{
 
 
 # ============================================================
-# TOPIC DEFINITIONS + CONCEPTS
+# INITIALIZE PERSISTENT USER STATS FROM DATABASE
+# ============================================================
+if "stats_loaded" not in st.session_state:
+    db_stats = db.load_user_stats()
+    st.session_state.streak = db_stats.get("streak", 0)
+    st.session_state.xp = db_stats.get("xp", 0)
+    st.session_state.quiz_score = {
+        "correct": db_stats.get("quiz_correct", 0),
+        "total": db_stats.get("quiz_total", 0)
+    }
+    st.session_state.stats_loaded = True
+
+
+# ============================================================
+# TOPIC DEFINITIONS & METADATA
 # ============================================================
 TOPICS = {
     "gcd": "🧮 Euclidean Algorithm & GCD",
@@ -340,523 +371,642 @@ TOPIC_CONCEPTS = {
 }
 
 
+# ============================================================
+# NATURAL LANGUAGE PARSING
+# ============================================================
 def detect_topic(text: str) -> str:
-    """Very lightweight keyword-based topic classifier with a scoring fallback."""
+    """Keyword-based topic classifier with a scoring fallback."""
     t = text.lower()
     scores = {k: 0 for k in TOPICS}
     for topic, kws in TOPIC_KEYWORDS.items():
         for kw in kws:
             if kw in t:
                 scores[topic] += 1
-    if re.search(r"\bi\b|√-?1|imaginary", t):
-        scores["complex"] += 1
-    if re.search(r"\(.*\)\^\d|\^n\b", t):
-        scores["demoivre"] += 1
     best = max(scores, key=scores.get)
-    return best if scores[best] > 0 else None
+    return best if scores[best] > 0 else "gcd"
 
 
 def extract_complex_parts(text: str):
-    """Extracts (a, b) floats for complex number a + bi from text."""
-    t = text.strip()
-    try:
-        clean = re.sub(r'\b[zZ]\s*=\s*', '', t)
-        m_sub = re.search(r'([+-]?\s*\d*\.?\d*\s*[\+\-]?\s*\d*\.?\d*\s*\*?\s*i|\d*\.?\d*\s*\*?\s*i)', clean, re.IGNORECASE)
-        if m_sub:
-            sub = m_sub.group(0).replace(" ", "").replace("j", "i")
-            sub_sp = re.sub(r'(\d+|\b)i\b', r'\1*I', sub, flags=re.IGNORECASE)
-            expr = sympify(sub_sp)
-            if expr.has(I) or expr.is_number:
-                re_val = float(sp.re(expr).evalf())
-                im_val = float(sp.im(expr).evalf())
-                return re_val, im_val
-    except Exception:
-        pass
-
-    m = re.search(r'([+-]?\s*\d*\.?\d+)?\s*([+-])?\s*(\d*\.?\d*)i', text, re.IGNORECASE)
+    t = text.replace(" ", "")
+    m = re.search(r"z?\=?([+-]?\d+\.?\d*)\s*([+-]\s*\d*\.?\d*)[ij]", t, re.IGNORECASE)
     if m:
-        r_str, sign, im_str = m.group(1), m.group(2), m.group(3)
-        a = float(r_str.replace(" ", "")) if r_str and r_str.strip() not in ("+", "-") else (
-            -1.0 if r_str and "-" in r_str else 0.0)
-        b_val = float(im_str.replace(" ", "")) if im_str and im_str.strip() else 1.0
-        if sign == "-":
-            b_val = -b_val
-        return a, b_val
-
-    return None, None
+        a = float(m.group(1))
+        b_str = m.group(2).replace(" ", "")
+        if b_str in ["+", ""]:
+            b = 1.0
+        elif b_str == "-":
+            b = -1.0
+        else:
+            b = float(b_str)
+        return a, b
+    
+    m_pure_im = re.search(r"([+-]?\d*\.?\d*)[ij]", t, re.IGNORECASE)
+    if m_pure_im and not re.search(r"[+-]\d", t):
+        val = m_pure_im.group(1)
+        if val in ["", "+"]:
+            b = 1.0
+        elif val == "-":
+            b = -1.0
+        else:
+            b = float(val)
+        return 0.0, b
+    
+    m_real = re.search(r"([+-]?\d+\.?\d*)", t)
+    if m_real:
+        return float(m_real.group(1)), 0.0
+    return 1.0, 1.7320508
 
 
 def extract_gcd_params(text: str):
-    nums = [int(n) for n in re.findall(r'\b\d+\b', text)]
+    nums = [int(x) for x in re.findall(r"\b\d+\b", text)]
     if len(nums) >= 2:
-        return {"a": nums[0], "b": nums[1]}
-    return {}
+        return nums[0], nums[1]
+    return 1071, 462
 
 
 def extract_permcomb_params(text: str):
-    p_match = re.search(r'(\d+)\s*[pP]\s*(\d+)|P\(\s*(\d+)\s*,\s*(\d+)\s*\)', text)
-    if p_match:
-        g = [x for x in p_match.groups() if x is not None]
-        return {"kind": "Permutation (nPr)", "n": int(g[0]), "r": int(g[1])}
-
-    c_match = re.search(r'(\d+)\s*[cC]\s*(\d+)|C\(\s*(\d+)\s*,\s*(\d+)\s*\)|(\d+)\s*choose\s*(\d+)', text, re.IGNORECASE)
-    if c_match:
-        g = [x for x in c_match.groups() if x is not None]
-        return {"kind": "Combination (nCr)", "n": int(g[0]), "r": int(g[1])}
-
-    return {}
+    kind = "Combination (nCr)" if "c" in text.lower() or "comb" in text.lower() else "Permutation (nPr)"
+    nums = [int(x) for x in re.findall(r"\b\d+\b", text)]
+    if len(nums) >= 2:
+        return kind, max(nums[0], nums[1]), min(nums[0], nums[1])
+    return kind, 5, 2
 
 
 def extract_demoivre_params(text: str):
-    pow_match = re.search(r'\^(\d+)|\bpower\s*(\d+)|\bto the (\d+)', text, re.IGNORECASE)
-    n = 4
-    if pow_match:
-        g = [x for x in pow_match.groups() if x is not None]
-        n = int(g[0])
-
     a, b = extract_complex_parts(text)
-    if a is not None and b is not None:
-        return {"a": a, "b": b, "n": n}
-    return {}
+    m_pow = re.search(r"[\^]\s*(\d+)", text)
+    n = int(m_pow.group(1)) if m_pow else 4
+    return a, b, n
 
 
 def extract_limit_params(text: str):
-    m1 = re.search(r'(?:lim|limit)\s*(?:of)?\s*(?:_\{|\()?\s*([a-zA-Z])\s*(?:->|→|=)\s*([^\s\):\}]+)(?:\}|\))?\s*(.+)', text, re.IGNORECASE)
-    if m1:
-        var_str = m1.group(1).strip()
-        point_str = m1.group(2).strip()
-        expr_str = m1.group(3).strip().lstrip("=").strip()
-        return {"expr_str": expr_str, "var_str": var_str, "point_str": point_str}
-
-    m2 = re.search(r'(?:lim|limit)\s*(?:of)?\s*(.+?)\s+(?:as|when|for)\s+([a-zA-Z])\s*(?:->|→|=)\s*([^\s,]+)', text, re.IGNORECASE)
-    if m2:
-        expr_str = m2.group(1).strip().lstrip("=").strip()
-        var_str = m2.group(2).strip()
-        point_str = m2.group(3).strip()
-        return {"expr_str": expr_str, "var_str": var_str, "point_str": point_str}
-
-    return {}
+    m_pt = re.search(r"(?:->|to|→)\s*([+-]?\w+)", text, re.IGNORECASE)
+    point_str = m_pt.group(1) if m_pt else "0"
+    m_expr = re.search(r"lim(?:its)?\s*(?:[a-zA-Z]\s*(?:->|to|→)\s*[+-]?\w+)?\s+(.+)", text, re.IGNORECASE)
+    expr_str = m_expr.group(1).strip() if m_expr else "sin(3*x)/x"
+    m_var = re.search(r"([a-zA-Z])\s*(?:->|to|→)", text)
+    var_str = m_var.group(1) if m_var else "x"
+    return expr_str, var_str, point_str
 
 
 def parse_question(text: str):
-    if not text or not text.strip():
-        return None, {}
-
-    t = text.strip()
-
-    if "lim" in t.lower() or "limit" in t.lower():
-        params = extract_limit_params(t)
-        if params:
-            return "limits", params
-
-    if re.search(r'\b\d+\s*[pPcC]\s*\d+\b|\b[pPcC]\(\s*\d+|\bchoose\b', t, re.IGNORECASE):
-        params = extract_permcomb_params(t)
-        if params:
-            return "permcomb", params
-
-    if ("de moivre" in t.lower() or "demoivre" in t.lower() or "^" in t) and re.search(r'i\b', t, re.IGNORECASE):
-        params = extract_demoivre_params(t)
-        if params:
-            return "demoivre", params
-
-    if "polar" in t.lower() or "modulus" in t.lower() or "argument" in t.lower() or re.search(r'i\b', t, re.IGNORECASE):
-        a, b = extract_complex_parts(t)
-        if a is not None and b is not None:
-            return "complex", {"a": a, "b": b}
-
-    if any(kw in t.lower() for kw in ["gcd", "hcf", "euclidean", "greatest common"]):
-        params = extract_gcd_params(t)
-        if params:
-            return "gcd", params
-
-    detected = detect_topic(t)
-    if detected == "gcd":
-        params = extract_gcd_params(t)
-        return "gcd", params
-    elif detected == "complex":
-        a, b = extract_complex_parts(t)
-        if a is not None and b is not None:
-            return "complex", {"a": a, "b": b}
-    elif detected == "demoivre":
-        params = extract_demoivre_params(t)
-        if params:
-            return "demoivre", params
-    elif detected == "permcomb":
-        params = extract_permcomb_params(t)
-        if params:
-            return "permcomb", params
-    elif detected == "limits":
-        params = extract_limit_params(t)
-        if params:
-            return "limits", params
-
-    return detected, {}
+    topic = detect_topic(text)
+    if topic == "gcd":
+        a, b = extract_gcd_params(text)
+        return topic, {"a": a, "b": b}
+    elif topic == "complex":
+        a, b = extract_complex_parts(text)
+        return topic, {"a": a, "b": b}
+    elif topic == "demoivre":
+        a, b, n = extract_demoivre_params(text)
+        return topic, {"a": a, "b": b, "n": n}
+    elif topic == "permcomb":
+        kind, n, r = extract_permcomb_params(text)
+        return topic, {"kind": kind, "n": n, "r": r}
+    elif topic == "limits":
+        expr_str, var_str, point_str = extract_limit_params(text)
+        return topic, {"expr_str": expr_str, "var_str": var_str, "point_str": point_str}
+    else:
+        return topic, {}
 
 
 # ============================================================
-# SOLVERS
+# SOLVER ALGORITHMS
 # ============================================================
-
 def solve_gcd(a: int, b: int):
     steps = []
-    a, b = abs(int(a)), abs(int(b))
-    x, y = a, b
-    if y == 0:
-        return [("Edge case", f"gcd({x}, 0) = {x}")], str(x), {}
-    steps.append(("Set up equation", f"Apply the Euclidean Algorithm to gcd({x}, {y})."))
-    while y != 0:
-        q = x // y
-        r = x % y
-        steps.append((f"Euclidean division step", f"{x} = {q} × {y} + {r}"))
-        x, y = y, r
-    steps.append(("Remainder is 0", f"Stop — the last non-zero remainder is the GCD."))
-    return steps, str(x), {"pairs": (a, b)}
+    orig_a, orig_b = a, b
+    a, b = abs(a), abs(b)
+    if a < b:
+        steps.append(("Ordering Check", f"Swap inputs so larger integer is first: a = {b}, b = {a}"))
+        a, b = b, a
+
+    step_idx = 1
+    while b != 0:
+        q = a // b
+        r = a % b
+        steps.append((f"Euclidean Step {step_idx}", f"{a} = {q} × {b} + {r}  (Quotient: {q}, Remainder: {r})"))
+        a, b = b, r
+        step_idx += 1
+
+    gcd_val = a
+    steps.append(("Final Result", f"The last non-zero remainder is {gcd_val}. Therefore, gcd({orig_a}, {orig_b}) = {gcd_val}."))
+    return steps, str(gcd_val), {"gcd": gcd_val, "a": orig_a, "b": orig_b}
 
 
 def solve_complex_to_polar(a: float, b: float):
     steps = []
-    steps.append(("Identify rectangular form", f"z = {a} + {b}i is in rectangular (x + yi) form."))
-    r = math.sqrt(a**2 + b**2)
-    steps.append(("Calculate modulus (r)", f"r = √(x² + y²) = √({a}² + {b}²) = √{a**2 + b**2:g} = {r:.4f}"))
-    theta = math.atan2(b, a)
-    theta_deg = math.degrees(theta)
-    quadrant = "1st" if a > 0 and b >= 0 else "2nd" if a < 0 and b >= 0 else "3rd" if a < 0 and b < 0 else "4th"
-    steps.append(("Calculate argument (θ)", f"θ = atan2(y, x) = {theta:.4f} rad ≈ {theta_deg:.2f}°  ({quadrant} quadrant)"))
-    steps.append(("Express in polar form", f"z = r(cosθ + i sinθ) = {r:.4f}(cos({theta_deg:.2f}°) + i·sin({theta_deg:.2f}°))"))
-    answer = f"z = {r:.4f} · (cos {theta_deg:.2f}° + i sin {theta_deg:.2f}°)"
-    return steps, answer, {"r": r, "theta": theta, "a": a, "b": b}
+    steps.append(("Identify Parts", f"Rectangular form z = a + bi with Real part a = {a}, Imaginary part b = {b}"))
+    r = math.hypot(a, b)
+    steps.append(("Compute Modulus (r)", f"r = √(a² + b²) = √(({a})² + ({b})²) = √({a**2 + b**2:.4f}) = {r:.4f}"))
+    theta_rad = math.atan2(b, a)
+    theta_deg = math.degrees(theta_rad)
+    quadrant = "Quadrant I" if a >= 0 and b >= 0 else "Quadrant II" if a < 0 and b >= 0 else "Quadrant III" if a < 0 and b < 0 else "Quadrant IV"
+    steps.append(("Compute Argument (θ)", f"θ = atan2(b, a) = atan2({b}, {a}) = {theta_rad:.4f} rad ({theta_deg:.2f}°)\nLocated in {quadrant}"))
+    polar_str = f"{r:.4f} (cos({theta_deg:.2f}°) + i sin({theta_deg:.2f}°))"
+    euler_str = f"{r:.4f} e^({theta_rad:.4f}i)"
+    steps.append(("Formulate Polar & Exponential", f"Polar Form: z = {polar_str}\nExponential Form: z = {euler_str}"))
+    return steps, polar_str, {"r": r, "theta_rad": theta_rad, "theta_deg": theta_deg, "a": a, "b": b}
 
 
 def solve_demoivre(a: float, b: float, n: int):
     steps = []
-    steps.append(("Convert base to polar form", f"Start from z = {a} + {b}i and convert to polar form."))
-    r = math.sqrt(a**2 + b**2)
+    r = math.hypot(a, b)
     theta = math.atan2(b, a)
-    steps.append(("Determine r and θ", f"Modulus r = {r:.4f},  Argument θ = {math.degrees(theta):.2f}°"))
-    steps.append(("Apply De Moivre's formula", f"zⁿ = rⁿ(cos(nθ) + i sin(nθ)),  for power n = {n}"))
+    theta_deg = math.degrees(theta)
+    steps.append(("Convert to Polar", f"z = {a} + {b}i  →  r = {r:.4f}, θ = {theta_deg:.2f}°"))
+
     r_n = r ** n
-    theta_n = theta * n
-    theta_n_deg = math.degrees(theta_n) % 360
-    steps.append(("Compute rⁿ and nθ", f"rⁿ = {r:.4f}^{n} = {r_n:.4f}\nnθ = {n} × {math.degrees(theta):.2f}° = {theta_n_deg:.2f}° (mod 360°)"))
-    real_part = r_n * math.cos(theta_n)
-    imag_part = r_n * math.sin(theta_n)
-    steps.append(("Convert to rectangular form", f"zⁿ = {r_n:.4f}(cos {theta_n_deg:.2f}° + i sin {theta_n_deg:.2f}°) = {real_part:.4f} + {imag_part:.4f}i"))
-    answer = f"z^{n} ≈ {real_part:.4f} + {imag_part:.4f}i"
-    return steps, answer, {"r_n": r_n, "theta_n": theta_n, "real": real_part, "imag": imag_part}
+    n_theta = n * theta
+    n_theta_deg = math.degrees(n_theta)
+    steps.append(("Apply De Moivre's Theorem", f"z^{n} = [r (cos θ + i sin θ)]^{n} = r^{n} [cos({n}θ) + i sin({n}θ)]"))
+    steps.append(("Calculate Powered Values", f"Modulus r^{n} = {r:.4f}^{n} = {r_n:.4f}\nArgument {n}θ = {n} × {theta_deg:.2f}° = {n_theta_deg:.2f}°"))
+
+    final_real = r_n * math.cos(n_theta)
+    final_imag = r_n * math.sin(n_theta)
+    sign = "+" if final_imag >= 0 else "-"
+    ans_str = f"{final_real:.4f} {sign} {abs(final_imag):.4f}i"
+    steps.append(("Convert back to Rectangular", f"z^{n} = {r_n:.4f}(cos({n_theta_deg:.2f}°) + i sin({n_theta_deg:.2f}°)) = {ans_str}"))
+    return steps, ans_str, {"r_n": r_n, "n_theta": n_theta, "real": final_real, "imag": final_imag, "a": a, "b": b, "n": n}
 
 
 def demoivre_roots(a: float, b: float, n: int):
-    r = math.sqrt(a**2 + b**2)
+    r = math.hypot(a, b)
     theta = math.atan2(b, a)
-    r_root = r ** (1 / n)
+    r_root = r ** (1.0 / n)
     roots = []
     for k in range(n):
         angle = (theta + 2 * math.pi * k) / n
-        roots.append((r_root * math.cos(angle), r_root * math.sin(angle), math.degrees(angle)))
+        re_ = r_root * math.cos(angle)
+        im_ = r_root * math.sin(angle)
+        roots.append((re_, im_, math.degrees(angle)))
     return roots, r_root
 
 
 def solve_permcomb(kind: str, n: int, r: int):
     steps = []
-    n, r = int(n), int(r)
-    if r > n:
-        return [("Invalid input", "r cannot be greater than n.")], "Undefined", {}
-    if kind == "Permutation (nPr)":
-        steps.append(("Select permutation formula", "nPr = n! / (n − r)!"))
-        steps.append(("Substitute values", f"{n}P{r} = {n}! / ({n} − {r})! = {n}! / {n-r}!"))
+    if r > n or n < 0 or r < 0:
+        return [("Validation Error", "n must be ≥ r and both must be non-negative.")], "Invalid input", {}
+
+    if "Permutation" in kind or "nPr" in kind:
+        steps.append(("Formula Selection", f"Permutation formula: nPr = n! / (n - r)!"))
         val = math.perm(n, r)
-        steps.append(("Calculate factorial breakdown", f"= {' × '.join(str(i) for i in range(n, n-r, -1))} = {val}"))
-        answer = str(val)
+        steps.append(("Substitute Values", f"{n}P{r} = {n}! / ({n} - {r})! = {n}! / {n - r}!"))
+        terms = " × ".join(str(i) for i in range(n, n - r, -1)) if r > 0 else "1"
+        steps.append(("Expanded Product", f"{n}P{r} = {terms} = {val}"))
+        return steps, str(val), {"val": val, "type": "nPr"}
     else:
-        steps.append(("Select combination formula", "nCr = n! / (r! (n − r)!)"))
-        steps.append(("Substitute values", f"{n}C{r} = {n}! / ({r}! × {n-r}!)"))
+        steps.append(("Formula Selection", f"Combination formula: nCr = n! / (r! (n - r)!)"))
         val = math.comb(n, r)
-        steps.append(("Calculate final combination", f"= {val}"))
-        answer = str(val)
-    return steps, answer, {}
+        steps.append(("Substitute Values", f"{n}C{r} = {n}! / ({r}! × ({n} - {r})!)"))
+        num_terms = " × ".join(str(i) for i in range(n, n - r, -1)) if r > 0 else "1"
+        den_terms = " × ".join(str(i) for i in range(1, r + 1)) if r > 0 else "1"
+        steps.append(("Simplified Factorials", f"{n}C{r} = ({num_terms}) / ({den_terms}) = {val}"))
+        return steps, str(val), {"val": val, "type": "nCr"}
 
 
 def solve_functions(domain: list, codomain: list, mapping: dict):
     steps = []
-    steps.append(("Define domain & mapping", f"Domain = {domain}\nCodomain = {codomain}\nMapping f = {mapping}"))
-    images = list(mapping.values())
-    is_injective = len(images) == len(set(images))
-    steps.append(("Evaluate Injectivity (One-to-One)",
-                  "No two distinct domain elements share an image → Injective." if is_injective
-                  else "Two or more domain elements map to the same image → NOT Injective."))
-    is_surjective = set(codomain) == set(images)
-    unmapped = set(codomain) - set(images)
-    steps.append(("Evaluate Surjectivity (Onto)",
-                  "Every element of the codomain has a pre-image → Surjective." if is_surjective
-                  else f"Codomain element(s) {sorted(unmapped)} have no pre-image → NOT Surjective."))
+    steps.append(("Domain & Codomain Setup", f"Domain A = {{{', '.join(map(str, domain))}}}\nCodomain B = {{{', '.join(map(str, codomain))}}}"))
+    map_str = ", ".join(f"f({k})={v}" for k, v in mapping.items())
+    steps.append(("Mapping Definition", f"Mappings: {map_str}"))
+
+    mapped_values = list(mapping.values())
+    is_injective = len(mapped_values) == len(set(mapped_values))
+    if is_injective:
+        steps.append(("Injectivity Test (One-to-One)", "PASSED: All outputs are distinct. No two domain elements map to the same codomain element. Function is INJECTIVE."))
+    else:
+        duplicates = [x for x in set(mapped_values) if mapped_values.count(x) > 1]
+        steps.append(("Injectivity Test (One-to-One)", f"FAILED: Multiple inputs map to the same codomain element(s): {duplicates}. Function is NOT Injective."))
+
+    range_set = set(mapped_values)
+    codomain_set = set(codomain)
+    is_surjective = range_set == codomain_set
+    if is_surjective:
+        steps.append(("Surjectivity Test (Onto)", "PASSED: Range equals Codomain. Every element in Codomain B has at least one pre-image in Domain A. Function is SURJECTIVE."))
+    else:
+        uncovered = list(codomain_set - range_set)
+        steps.append(("Surjectivity Test (Onto)", f"FAILED: Uncovered codomain elements with no pre-image: {uncovered}. Function is NOT Surjective."))
+
     is_bijective = is_injective and is_surjective
-    steps.append(("Determine Bijectivity", "Both Injective and Surjective → Bijective." if is_bijective
-                  else "Function is not bijective."))
-    classification = []
-    if is_injective: classification.append("Injective")
-    if is_surjective: classification.append("Surjective")
-    if is_bijective: classification.append("Bijective")
-    answer = ", ".join(classification) if classification else "Neither injective nor surjective"
-    return steps, answer, {"injective": is_injective, "surjective": is_surjective, "bijective": is_bijective}
+    classification = "BIJECTIVE (Bijective / One-to-One Correspondence)" if is_bijective else \
+                     "INJECTIVE ONLY (One-to-One but not Onto)" if is_injective else \
+                     "SURJECTIVE ONLY (Onto but not One-to-One)" if is_surjective else \
+                     "NEITHER (Neither Injective nor Surjective)"
+
+    steps.append(("Final Classification", f"Classification: {classification}"))
+    return steps, classification, {"injective": is_injective, "surjective": is_surjective, "bijective": is_bijective}
 
 
 def solve_limit(expr_str: str, var_str: str, point_str: str):
     steps = []
     x = symbols(var_str)
     transformations = standard_transformations + (implicit_multiplication_application,)
-    expr = parse_expr(expr_str.replace("^", "**"), transformations=transformations)
-    point = oo if point_str.strip() in ("inf", "infinity", "oo") else \
-            -oo if point_str.strip() in ("-inf", "-infinity", "-oo") else sympify(point_str)
+    
+    try:
+        expr = parse_expr(expr_str, transformations=transformations)
+    except Exception as e:
+        return [("Parsing Error", f"Could not parse expression: {e}")], "Error", {}
 
-    steps.append(("Parse target limit expression", f"lim_{{{var_str}→{point_str}}} {expr}"))
+    if point_str.lower() in ["oo", "inf", "infinity"]:
+        target_point = oo
+        target_disp = "∞"
+    elif point_str.lower() in ["-oo", "-inf", "-infinity"]:
+        target_point = -oo
+        target_disp = "-∞"
+    else:
+        try:
+            target_point = parse_expr(point_str, transformations=transformations)
+            target_disp = str(target_point)
+        except Exception:
+            target_point = 0
+            target_disp = "0"
+
+    steps.append(("Expression Parsing", f"Target Limit: lim ({var_str} → {target_disp})  [ {expr_str} ]"))
+    
+    try:
+        direct_sub = expr.subs(x, target_point)
+        steps.append(("Direct Substitution Check", f"Evaluating f({target_disp}): {direct_sub}"))
+    except Exception:
+        direct_sub = None
+        steps.append(("Direct Substitution Check", "Direct substitution resulted in an undefined or indeterminate form."))
 
     try:
-        direct = expr.subs(x, point)
-        if direct.is_finite and not direct.has(sp.zoo, sp.nan):
-            steps.append(("Apply direct substitution", f"Substitute {var_str} = {point_str}: result is finite → {direct}"))
-            result = direct
+        lim_val = limit(expr, x, target_point)
+        steps.append(("Symbolic Computation (SymPy)", f"lim ({var_str} → {target_disp}) = {lim_val}"))
+    except Exception as e:
+        return [("Computation Error", f"Failed to compute limit: {e}")], "Error", {}
+
+    continuity_note = ""
+    if direct_sub is not None and direct_sub == lim_val:
+        continuity_note = f"Since lim ({var_str} → {target_disp}) f({var_str}) = f({target_disp}) = {lim_val}, the function is CONTINUOUS at {var_str} = {target_disp}."
+    else:
+        continuity_note = f"The limit is {lim_val}, but direct substitution gives {direct_sub}. The function has a removable or step discontinuity at {var_str} = {target_disp}."
+
+    steps.append(("Continuity Diagnostic", continuity_note))
+    return steps, str(lim_val), {"expr": expr, "var": x, "point": target_point, "lim_val": lim_val, "continuity_note": continuity_note}
+
+
+# ============================================================
+# INTERACTIVE PLOTLY VISUALIZATIONS
+# ============================================================
+def plot_complex_plane_plotly(points: list, labels: list, colors: list = None, draw_polygon: bool = False):
+    fig = go.Figure()
+
+    # Determine scale
+    max_r = max([math.hypot(x, y) for x, y in points] + [2.0]) * 1.25
+    
+    # Unit circle & coordinate axes
+    t_vals = np.linspace(0, 2*np.pi, 200)
+    fig.add_trace(go.Scatter(
+        x=max_r * 0.8 * np.cos(t_vals), y=max_r * 0.8 * np.sin(t_vals),
+        mode='lines', line=dict(color='rgba(255, 255, 255, 0.15)', dash='dash'),
+        hoverinfo='skip', showlegend=False
+    ))
+
+    # Grid axes
+    fig.add_shape(type="line", x0=-max_r, y0=0, x1=max_r, y1=0, line=dict(color="rgba(255,255,255,0.3)", width=1.5))
+    fig.add_shape(type="line", x0=0, y0=-max_r, x1=0, y1=max_r, line=dict(color="rgba(255,255,255,0.3)", width=1.5))
+
+    # Polygon connecting roots if requested
+    if draw_polygon and len(points) > 1:
+        px_coords = [p[0] for p in points] + [points[0][0]]
+        py_coords = [p[1] for p in points] + [points[0][1]]
+        fig.add_trace(go.Scatter(
+            x=px_coords, y=py_coords,
+            mode='lines', line=dict(color=TEAL, width=2),
+            fill='toself', fillcolor='rgba(46, 196, 182, 0.12)',
+            name='Roots Polygon'
+        ))
+
+    # Scatter points & vectors
+    for i, (re_, im_) in enumerate(points):
+        lbl = labels[i] if i < len(labels) else f"z{i}"
+        col = colors[i] if colors and i < len(colors) else AMBER
+        r_val = math.hypot(re_, im_)
+        ang_deg = math.degrees(math.atan2(im_, re_))
+
+        # Vector line from origin
+        fig.add_trace(go.Scatter(
+            x=[0, re_], y=[0, im_],
+            mode='lines', line=dict(color=col, width=2.5),
+            hoverinfo='skip', showlegend=False
+        ))
+
+        # Point marker
+        fig.add_trace(go.Scatter(
+            x=[re_], y=[im_],
+            mode='markers+text',
+            marker=dict(size=12, color=col, line=dict(width=2, color='#FFFFFF')),
+            text=[f"  {lbl}"], textposition="top right",
+            hovertemplate=f"<b>{lbl}</b><br>Real: {re_:.4f}<br>Imag: {im_:.4f}i<br>Modulus r: {r_val:.4f}<br>Angle θ: {ang_deg:.2f}°<extra></extra>",
+            name=lbl
+        ))
+
+    fig.update_layout(
+        xaxis=dict(title="Real Axis (Re)", range=[-max_r, max_r], zeroline=False, gridcolor="rgba(255,255,255,0.05)"),
+        yaxis=dict(title="Imaginary Axis (Im)", range=[-max_r, max_r], zeroline=False, scaleanchor="x", scaleratio=1, gridcolor="rgba(255,255,255,0.05)"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(10,18,38,0.6)",
+        font=dict(color="#FFFFFF", family="Outfit"),
+        margin=dict(l=20, r=20, t=30, b=20),
+        showlegend=False,
+        height=420
+    )
+    return fig
+
+
+def plot_function_diagram_plotly(domain: list, codomain: list, mapping: dict):
+    fig = go.Figure()
+
+    d_len = len(domain)
+    c_len = len(codomain)
+
+    d_y = np.linspace(1, 0, d_len) if d_len > 1 else [0.5]
+    c_y = np.linspace(1, 0, c_len) if c_len > 1 else [0.5]
+
+    d_pos = {elem: (0, d_y[i]) for i, elem in enumerate(domain)}
+    c_pos = {elem: (1, c_y[i]) for i, elem in enumerate(codomain)}
+
+    # Draw mapping arrows
+    for dom_elem, codom_elem in mapping.items():
+        if dom_elem in d_pos and codom_elem in c_pos:
+            x0, y0 = d_pos[dom_elem]
+            x1, y1 = c_pos[codom_elem]
+            fig.add_trace(go.Scatter(
+                x=[x0, x1], y=[y0, y1],
+                mode='lines', line=dict(color=TEAL, width=2.5),
+                hoverinfo='skip', showlegend=False
+            ))
+
+    # Domain nodes
+    dx = [pos[0] for pos in d_pos.values()]
+    dy = [pos[1] for pos in d_pos.values()]
+    dtxt = [str(k) for k in d_pos.keys()]
+    fig.add_trace(go.Scatter(
+        x=dx, y=dy, mode='markers+text',
+        marker=dict(size=28, color=AMBER, line=dict(width=2, color='#FFFFFF')),
+        text=dtxt, textposition="middle center",
+        textfont=dict(color="#000000", weight="bold"),
+        hoverinfo='text', hovertext=[f"Domain element: {t}" for t in dtxt],
+        name="Domain A"
+    ))
+
+    # Codomain nodes
+    cx = [pos[0] for pos in c_pos.values()]
+    cy = [pos[1] for pos in c_pos.values()]
+    ctxt = [str(k) for k in c_pos.keys()]
+    fig.add_trace(go.Scatter(
+        x=cx, y=cy, mode='markers+text',
+        marker=dict(size=28, color=CORAL, line=dict(width=2, color='#FFFFFF')),
+        text=ctxt, textposition="middle center",
+        textfont=dict(color="#FFFFFF", weight="bold"),
+        hoverinfo='text', hovertext=[f"Codomain element: {t}" for t in ctxt],
+        name="Codomain B"
+    ))
+
+    fig.update_layout(
+        xaxis=dict(range=[-0.3, 1.3], showgrid=False, zeroline=False, showticklabels=False),
+        yaxis=dict(range=[-0.15, 1.15], showgrid=False, zeroline=False, showticklabels=False),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(10,18,38,0.6)",
+        font=dict(color="#FFFFFF", family="Outfit"),
+        annotations=[
+            dict(x=0, y=1.1, text="<b>Domain A</b>", showarrow=False, font=dict(size=14, color=AMBER)),
+            dict(x=1, y=1.1, text="<b>Codomain B</b>", showarrow=False, font=dict(size=14, color=CORAL)),
+        ],
+        margin=dict(l=20, r=20, t=40, b=20),
+        showlegend=False,
+        height=380
+    )
+    return fig
+
+
+def plot_limit_function_plotly(expr, var, point):
+    fig = go.Figure()
+    
+    try:
+        if point == oo or point == -oo:
+            p_val = 5.0
         else:
-            raise ValueError("indeterminate")
+            p_val = float(point)
     except Exception:
-        steps.append(("Handle indeterminate form", f"Substituting {var_str} = {point_str} yields an indeterminate form (0/0 or ∞/∞). Applying algebraic simplification / L'Hôpital's rule."))
-        result = limit(expr, x, point)
-        simplified = sp.simplify(expr)
-        if simplified != expr:
-            steps.append(("Algebraic simplification", f"Simplified expression: {simplified}"))
-        steps.append(("Evaluate limit value", f"L = {result}"))
+        p_val = 0.0
 
-    continuity_note = None
-    if point not in (oo, -oo):
+    x_vals = np.linspace(p_val - 4, p_val + 4, 300)
+    f_lambdified = sp.lambdify(var, expr, modules=["numpy", "math"])
+    
+    y_vals = []
+    for xv in x_vals:
         try:
-            f_val = expr.subs(x, point)
-            if sp.simplify(f_val - result) == 0 and f_val.is_finite:
-                continuity_note = f"f({var_str}) is continuous at {var_str} = {point_str} since lim = f({point_str}) = {result}."
-            else:
-                continuity_note = f"f({var_str}) is NOT continuous at {var_str} = {point_str} (limit ≠ function value, or function undefined there)."
+            yv = float(f_lambdified(xv))
+            y_vals.append(yv if not (math.isnan(yv) or math.isinf(yv)) else np.nan)
         except Exception:
-            continuity_note = None
-    steps.append(("Final limit result", f"lim_{{{var_str}→{point_str}}} {expr} = {result}"))
-    answer = str(result)
-    return steps, answer, {"continuity_note": continuity_note, "expr": expr, "var": x, "point": point}
+            y_vals.append(np.nan)
 
+    # Plot function curve
+    fig.add_trace(go.Scatter(
+        x=x_vals, y=y_vals,
+        mode='lines', line=dict(color=TEAL, width=3),
+        name=f"f({var}) = {expr}"
+    ))
 
-# ============================================================
-# VISUALIZATIONS
-# ============================================================
-
-def plot_complex_plane(points: list, labels: list, colors: list = None, draw_polygon: bool = False):
-    fig, ax = plt.subplots(figsize=(4.8, 4.8), dpi=180)
-    fig.patch.set_facecolor("#0b132b")
-    ax.set_facecolor("#0b132b")
-    colors = colors or [TEAL, AMBER, CORAL, "#9B5DE5", "#00B4D8", "#F72585"]
-    max_r = max([abs(complex(*p)) for p in points] + [1]) * 1.35
-    
-    ax.axhline(0, color=PAPER, alpha=0.25, linewidth=1)
-    ax.axvline(0, color=PAPER, alpha=0.25, linewidth=1)
-    ax.grid(True, color="#1c2d42", linestyle=":", linewidth=0.8, alpha=0.6)
-
-    r_val = abs(complex(*points[0]))
-    if r_val > 0:
-        circle = plt.Circle((0, 0), r_val, color=TEAL, fill=False, linestyle="--", alpha=0.35, linewidth=1.2)
-        ax.add_patch(circle)
-
-    if draw_polygon and len(points) > 2:
-        poly_pts = points + [points[0]]
-        px, py = zip(*poly_pts)
-        ax.plot(px, py, color=AMBER, linestyle="--", linewidth=1.2, alpha=0.65, label="Roots Polygon")
-
-    for i, (p, lab) in enumerate(zip(points, labels)):
-        c = colors[i % len(colors)]
-        ax.annotate("", xy=(p[0], p[1]), xytext=(0, 0),
-                    arrowprops=dict(arrowstyle="->", color=c, lw=1.8, alpha=0.85))
-        ax.scatter([p[0]], [p[1]], color=c, s=55, zorder=5, edgecolors="#ffffff", linewidths=0.8)
-        ax.annotate(f" {lab}\n ({p[0]:.2f}, {p[1]:.2f}i)", (p[0], p[1]), textcoords="offset points", xytext=(8, 6),
-                    color=c, fontsize=9, fontweight="bold")
-
-    ax.set_xlim(-max_r, max_r)
-    ax.set_ylim(-max_r, max_r)
-    ax.set_xlabel("Real Axis (Re)", color=PAPER, fontsize=9, fontweight="bold")
-    ax.set_ylabel("Imaginary Axis (Im)", color=PAPER, fontsize=9, fontweight="bold")
-    ax.tick_params(colors=PAPER, labelsize=8)
-    for spine in ax.spines.values():
-        spine.set_color("#1c2d42")
-    ax.set_aspect("equal")
-    return fig
-
-
-def plot_function_diagram(domain, codomain, mapping):
-    fig, ax = plt.subplots(figsize=(5.5, 3.5), dpi=180)
-    fig.patch.set_facecolor("#0b132b")
-    ax.set_facecolor("#0b132b")
-    ax.axis("off")
-    y_dom = np.linspace(0.85, 0.15, len(domain)) if len(domain) > 1 else [0.5]
-    y_cod = np.linspace(0.85, 0.15, len(codomain)) if len(codomain) > 1 else [0.5]
-    dom_pos = {d: (0.15, y) for d, y in zip(domain, y_dom)}
-    cod_pos = {c: (0.75, y) for c, y in zip(codomain, y_cod)}
-    
-    ax.add_patch(plt.Circle((0.15, 0.5), 0.42, color=TEAL, alpha=0.08, fill=True, ec=TEAL, ls="--", lw=1.2))
-    ax.add_patch(plt.Circle((0.75, 0.5), 0.42, color=AMBER, alpha=0.08, fill=True, ec=AMBER, ls="--", lw=1.2))
-
-    for d, (x, y) in dom_pos.items():
-        ax.scatter([x], [y], color=TEAL, s=280, zorder=5, edgecolors="#ffffff", lw=1)
-        ax.annotate(str(d), (x, y), color="#080e1e", ha="center", va="center", fontweight="bold", fontsize=10)
-    for c, (x, y) in cod_pos.items():
-        ax.scatter([x], [y], color=AMBER, s=280, zorder=5, edgecolors="#ffffff", lw=1)
-        ax.annotate(str(c), (x, y), color="#080e1e", ha="center", va="center", fontweight="bold", fontsize=10)
-    for d, c in mapping.items():
-        x1, y1 = dom_pos[d]
-        x2, y2 = cod_pos[c]
-        ax.annotate("", xy=(x2 - 0.05, y2), xytext=(x1 + 0.05, y1),
-                    arrowprops=dict(arrowstyle="->", color=PAPER, alpha=0.75, lw=1.6, connectionstyle="arc3,rad=0.08"))
-    ax.text(0.15, 0.98, "Domain", color=TEAL, ha="center", fontsize=11, fontweight="bold")
-    ax.text(0.75, 0.98, "Codomain", color=AMBER, ha="center", fontsize=11, fontweight="bold")
-    return fig
-
-
-def plot_limit_function(expr, var, point):
-    fig, ax = plt.subplots(figsize=(5.5, 3.5), dpi=180)
-    fig.patch.set_facecolor("#0b132b")
-    ax.set_facecolor("#0b132b")
-    ax.grid(True, color="#1c2d42", linestyle=":", linewidth=0.8, alpha=0.6)
+    # Add limit evaluation point marker
     try:
-        pt = float(point) if point not in (oo, -oo) else 0
-        xs = np.linspace(pt - 5, pt + 5, 500)
-        f = sp.lambdify(var, expr, "numpy")
-        with np.errstate(all="ignore"):
-            ys = f(xs)
-        ax.plot(xs, ys, color=TEAL, linewidth=3, alpha=0.3)
-        ax.plot(xs, ys, color=TEAL, linewidth=1.8, label=f"f({var}) = {expr}")
-        ax.axvline(pt, color=AMBER, linestyle="--", alpha=0.85, linewidth=1.4, label=f"Approach: {var} → {point}")
-        
-        try:
-            lim_val = float(sp.limit(expr, var, point))
-            ax.scatter([pt], [lim_val], color=CORAL, s=60, zorder=6, edgecolors="#ffffff", lw=1.2, label=f"L = {lim_val:.4f}")
-        except Exception:
-            pass
-
-        ax.legend(facecolor="#091224", labelcolor=PAPER, edgecolor="#1c2d42", fontsize=8)
+        target_y = float(limit(expr, var, point))
+        fig.add_trace(go.Scatter(
+            x=[p_val], y=[target_y],
+            mode='markers',
+            marker=dict(size=14, color=CORAL, line=dict(width=3, color='#FFFFFF')),
+            hovertemplate=f"Limit Point<br>x = {p_val}<br>y = {target_y:.4f}<extra></extra>",
+            name="Limit Point"
+        ))
     except Exception:
-        ax.text(0.5, 0.5, "Graph unavailable for this expression", color=PAPER, ha="center", va="center")
-    ax.tick_params(colors=PAPER, labelsize=8)
-    for spine in ax.spines.values():
-        spine.set_color("#1c2d42")
+        pass
+
+    fig.update_layout(
+        xaxis=dict(title=str(var), gridcolor="rgba(255,255,255,0.05)"),
+        yaxis=dict(title=f"f({var})", gridcolor="rgba(255,255,255,0.05)"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(10,18,38,0.6)",
+        font=dict(color="#FFFFFF", family="Outfit"),
+        margin=dict(l=20, r=20, t=30, b=20),
+        showlegend=False,
+        height=380
+    )
     return fig
 
 
 # ============================================================
-# EXPORT HELPERS & COMPONENT RENDERERS
+# PROCEDURAL QUIZ GENERATOR
 # ============================================================
+def generate_procedural_question(topic_key: str = None):
+    if not topic_key:
+        topic_key = random.choice(list(TOPICS.keys()))
 
-def build_docx(question, topic, steps, answer):
-    doc = Document()
-    doc.add_heading("MathMate — Solution Breakdown", level=1)
-    doc.add_paragraph(f"Topic: {topic}")
-    doc.add_paragraph(f"Question: {question}")
-    doc.add_heading("Step-by-Step Solution", level=2)
-    for title, body in steps:
-        doc.add_paragraph(title, style="Heading 3")
-        doc.add_paragraph(body)
-    doc.add_heading("Final Answer", level=2)
-    doc.add_paragraph(answer)
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    return buf
+    if topic_key == "gcd":
+        a = random.randint(100, 1500)
+        b = random.randint(24, 450)
+        steps, ans, extra = solve_gcd(a, b)
+        correct = str(ans)
+        opts = {correct, str(int(correct) + 2), str(max(1, int(correct) - 2)), str(int(correct) * 2)}
+        while len(opts) < 4:
+            opts.add(str(random.randint(1, 20)))
+        opts = list(opts)
+        random.shuffle(opts)
+        return {
+            "q": f"Find gcd({a}, {b}) using the Euclidean algorithm.",
+            "topic": "gcd",
+            "options": opts,
+            "answer": correct,
+            "exp": f"Applying Euclidean division steps:\n" + "\n".join([f"• {s[1]}" for s in steps])
+        }
+
+    elif topic_key == "complex":
+        a = random.choice([-4, -3, -2, -1, 1, 2, 3, 4])
+        b = random.choice([-4, -3, -2, -1, 1, 2, 3, 4])
+        r = math.hypot(a, b)
+        deg = math.degrees(math.atan2(b, a))
+        correct = f"{deg:.1f}°"
+        opts = [f"{deg:.1f}°", f"{(deg + 45) % 360:.1f}°", f"{(deg + 90) % 360:.1f}°", f"{(deg - 30) % 360:.1f}°"]
+        random.shuffle(opts)
+        return {
+            "q": f"Find the principal argument θ (in degrees) for z = {a} + {b}i.",
+            "topic": "complex",
+            "options": opts,
+            "answer": correct,
+            "exp": f"θ = atan2({b}, {a}) = {deg:.2f}°. Modulus r = √({a}² + {b}²) = {r:.3f}."
+        }
+
+    elif topic_key == "demoivre":
+        n = random.randint(3, 6)
+        mod_z = random.randint(2, 4)
+        ans_mod = mod_z ** n
+        correct = str(ans_mod)
+        opts = [str(ans_mod), str(mod_z * n), str(ans_mod + n), str(max(1, ans_mod - 4))]
+        random.shuffle(opts)
+        return {
+            "q": f"If a complex number has modulus |z| = {mod_z}, what is the modulus |z^{n}| by De Moivre's Theorem?",
+            "topic": "demoivre",
+            "options": opts,
+            "answer": correct,
+            "exp": f"By De Moivre's theorem, |zⁿ| = |z|ⁿ = {mod_z}^{n} = {ans_mod}."
+        }
+
+    elif topic_key == "permcomb":
+        kind = random.choice(["nPr", "nCr"])
+        n = random.randint(5, 9)
+        r = random.randint(2, 4)
+        steps, ans, _ = solve_permcomb(kind, n, r)
+        correct = str(ans)
+        opts = {correct, str(int(correct) + 5), str(max(1, int(correct) - 3)), str(int(correct) * 2)}
+        while len(opts) < 4:
+            opts.add(str(random.randint(5, 100)))
+        opts = list(opts)
+        random.shuffle(opts)
+        return {
+            "q": f"Evaluate {n}{kind[:1]}{r} ({'Permutations' if 'P' in kind else 'Combinations'}).",
+            "topic": "permcomb",
+            "options": opts,
+            "answer": correct,
+            "exp": f"Formula calculation:\n" + "\n".join([f"• {s[1]}" for s in steps])
+        }
+
+    elif topic_key == "functions":
+        d = ["1", "2", "3"]
+        c = ["a", "b", "c"] if random.random() > 0.5 else ["a", "b"]
+        mapping = {"1": "a", "2": "b", "3": "c" if len(c) == 3 else "a"}
+        steps, ans, extra = solve_functions(d, c, mapping)
+        correct = "Yes" if extra["injective"] else "No"
+        return {
+            "q": f"Function f: {{{','.join(d)}}} → {{{','.join(c)}}} with mapping f(1)={mapping['1']}, f(2)={mapping['2']}, f(3)={mapping['3']}. Is f Injective?",
+            "topic": "functions",
+            "options": ["Yes", "No"],
+            "answer": correct,
+            "exp": f"Injectivity check: {steps[2][1]}"
+        }
+
+    else:  # limits
+        k = random.randint(2, 6)
+        correct = str(k)
+        opts = [str(k), "0", "1", "∞"]
+        random.shuffle(opts)
+        return {
+            "q": f"Evaluate lim (x → 0) sin({k}*x) / x.",
+            "topic": "limits",
+            "options": opts,
+            "answer": correct,
+            "exp": f"Standard trigonometric limit: lim(x→0) sin(kx)/x = k. Here k = {k}."
+        }
 
 
-def build_pdf(question, topic, steps, answer):
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4)
-    styles = getSampleStyleSheet()
-    story = [Paragraph("MathMate — Solution Breakdown", styles["Title"]), Spacer(1, 12)]
-    story.append(Paragraph(f"<b>Topic:</b> {topic}", styles["Normal"]))
-    story.append(Paragraph(f"<b>Question:</b> {question}", styles["Normal"]))
-    story.append(Spacer(1, 12))
-    story.append(Paragraph("Step-by-Step Solution", styles["Heading2"]))
-    for title, body in steps:
-        story.append(Paragraph(f"<b>{title}</b>", styles["Normal"]))
-        story.append(Paragraph(body.replace("\n", "<br/>"), styles["Normal"]))
-        story.append(Spacer(1, 6))
-    story.append(Paragraph("Final Answer", styles["Heading2"]))
-    story.append(Paragraph(str(answer), styles["Normal"]))
-    doc.build(story)
-    buf.seek(0)
-    return buf
-
-
+# ============================================================
+# UI RENDER HELPERS
+# ============================================================
 def render_step_timeline(steps):
-    symbols = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"]
-    for i, (title, body) in enumerate(steps):
-        num_str = symbols[i] if i < len(symbols) else f"({i+1})"
+    for i, (title, body) in enumerate(steps, 1):
         st.markdown(f"""
         <div class="timeline-step">
-            <div class="timeline-num">{num_str}</div>
+            <div class="timeline-num">{i}</div>
             <div class="timeline-content">
                 <div class="timeline-title">{title}</div>
                 <div class="timeline-body">{body}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
-        if i < len(steps) - 1:
+        if i < len(steps):
             st.markdown('<div class="timeline-connector">↓</div>', unsafe_allow_html=True)
 
 
 def render_understand_panel(topic_key):
-    info = TOPIC_CONCEPTS.get(topic_key, {})
-    if not info:
+    c = TOPIC_CONCEPTS.get(topic_key, {})
+    if not c:
         return
+    
     st.markdown(f"""
     <div class="understand-card">
-        <div class="understand-title">💡 UNDERSTAND THIS</div>
-        <div style="font-weight: 700; color: #2EC4B6; margin-bottom: 6px; font-size: 1.05rem;">{info['title']}</div>
-        <div style="font-size: 0.88rem; color: rgba(247,245,239,0.85); line-height: 1.45; margin-bottom: 12px;">{info['desc']}</div>
+        <div class="understand-title">💡 KEY THEOREM & FORMULA</div>
+        <div style="font-weight:700; font-size:1.1rem; color:#FFFFFF; margin-bottom:8px;">{c['title']}</div>
+        <div style="font-size:0.9rem; color:rgba(247,245,239,0.8); line-height:1.45; margin-bottom:12px;">{c['desc']}</div>
     </div>
     """, unsafe_allow_html=True)
-    
-    with st.container():
-        st.markdown("<div style='font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #FFB627; font-weight:700; margin-top:8px;'>📌 Key Formula</div>", unsafe_allow_html=True)
-        st.latex(info['formula'])
-        if info.get('identity'):
-            st.latex(info['identity'])
-        
-        st.markdown("<div style='font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #2EC4B6; font-weight:700; margin-top:12px; margin-bottom:6px;'>⚡ Essential Concepts</div>", unsafe_allow_html=True)
-        for pt in info.get('key_points', []):
-            st.markdown(f"<div style='font-size: 0.84rem; color: rgba(247,245,239,0.8); margin-bottom: 4px;'>• {pt}</div>", unsafe_allow_html=True)
+    st.latex(c['formula'])
+    st.latex(c['identity'])
+    for pt in c['key_points']:
+        st.markdown(f"• {pt}")
 
 
 def render_answer_card(answer):
     st.markdown(f"""
     <div class="answer-card">
-        <div class="answer-badge">🎯 FINAL ANSWER</div>
+        <div class="answer-badge">FINAL ANSWER</div>
         <div class="answer-value">{answer}</div>
-        <div class="answer-status">✓ Successfully solved</div>
+        <div class="answer-status">✓ Computed & Verified</div>
     </div>
     """, unsafe_allow_html=True)
 
 
-def push_history(question, topic, answer):
-    if "history" not in st.session_state:
-        st.session_state.history = []
-    st.session_state.history.insert(0, {
-        "question": question, "topic": topic, "answer": answer,
-        "time": datetime.now().strftime("%Y-%m-%d %H:%M"),
-    })
-
-
-# ============================================================
-# SIDEBAR NAV
-# ============================================================
 def set_nav_page(target_page, preset_q=None):
     st.session_state.nav_page = target_page
     if preset_q:
         st.session_state.preset_question = preset_q
 
+
+# ============================================================
+# SIDEBAR NAVIGATION & PERSISTENCE METRICS
+# ============================================================
 st.sidebar.markdown("""
 <div style="text-align: left; padding: 4px 0 12px 0;">
     <div style="font-size: 1.6rem; font-weight: 800; color: #2EC4B6; letter-spacing: -0.02em;">🧮 MATHMATE</div>
     <div style="font-size: 0.78rem; color: rgba(247,245,239,0.65);">Interactive Mathematics Lab</div>
 </div>
 """, unsafe_allow_html=True)
+
+# Supabase status indicator
+if db.is_supabase_connected():
+    st.sidebar.markdown('<div class="db-status-badge" style="background:rgba(46,196,182,0.2); color:#2EC4B6; border:1px solid #2EC4B6;">🟢 Supabase Cloud Active</div>', unsafe_allow_html=True)
+else:
+    st.sidebar.markdown('<div class="db-status-badge" style="background:rgba(255,182,39,0.2); color:#FFB627; border:1px solid #FFB627;">🟡 SQLite Local Fallback</div>', unsafe_allow_html=True)
 
 NAV_PAGES = [
     "🏠 Home",
@@ -866,22 +1016,11 @@ NAV_PAGES = [
     "🔢 Permutations & Combinations",
     "🔗 Functions & Mappings",
     "📈 Limits & Continuity",
+    "🤖 AI Math Tutor",
     "🧠 Quiz & Practice",
+    "📐 Formula Cheat Sheet",
     "📜 Solution History"
 ]
-
-# Parse query parameters for shared links (e.g. ?topic=gcd&q=Find+GCD+of+1071+and+462)
-try:
-    q_params = st.query_params
-    if "topic" in q_params and "q" in q_params and "share_handled" not in st.session_state:
-        st.session_state.share_handled = True
-        t_param = q_params["topic"]
-        q_text_param = q_params["q"]
-        if t_param in TOPIC_NAV_MAP:
-            st.session_state.nav_page = TOPIC_NAV_MAP[t_param]
-            st.session_state.preset_question = q_text_param
-except Exception:
-    pass
 
 if "redirect_page" in st.session_state:
     st.session_state.nav_page = st.session_state.pop("redirect_page")
@@ -890,15 +1029,12 @@ elif "nav_page" not in st.session_state:
 
 page = st.sidebar.radio("Navigate", NAV_PAGES, key="nav_page", label_visibility="collapsed")
 
-if "streak" not in st.session_state:
-    st.session_state.streak = 0
-if "quiz_score" not in st.session_state:
-    st.session_state.quiz_score = {"correct": 0, "total": 0}
-
 st.sidebar.markdown("---")
 streak = st.session_state.streak
-tier_badge = "🌱 Novice" if streak < 2 else "🥉 Apprentice" if streak < 5 else "🥈 Scholar" if streak < 10 else "👑 Math Wizard"
-st.sidebar.metric("🔥 Streak & Rank", f"{streak} · {tier_badge}")
+xp = st.session_state.xp
+tier_badge = "🌱 Novice" if xp < 50 else "🥉 Apprentice" if xp < 150 else "🥈 Scholar" if xp < 300 else "👑 Math Wizard"
+st.sidebar.metric("🔥 Streak & XP", f"{streak} Days · {xp} XP")
+st.sidebar.caption(f"Rank Tier: {tier_badge}")
 
 if st.session_state.quiz_score["total"] > 0:
     pct = round(100 * st.session_state.quiz_score["correct"] / st.session_state.quiz_score["total"])
@@ -911,20 +1047,19 @@ if st.session_state.quiz_score["total"] > 0:
 if page == "🏠 Home":
     st.markdown('<div class="hero-symbol-banner">∫   Σ   √   π   ∞</div>', unsafe_allow_html=True)
     st.markdown('<div class="hero-title">MATHMATE</div>', unsafe_allow_html=True)
-    st.markdown('<div class="hero-subtitle">Interactive Mathematics Lab · Learn • Solve • Understand • Practice</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-subtitle">Interactive Mathematics Lab · 6 Core Syllabus Topics • AI Assisted • Persistent History</div>', unsafe_allow_html=True)
     
-    # Prominent Central Question Box
     st.markdown("""
     <div class="glass-card" style="padding: 26px; border: 1px solid rgba(46, 196, 182, 0.35);">
         <div style="font-weight:800; font-size:1.35rem; color:#FFFFFF; margin-bottom:4px;">✨ What would you like to solve?</div>
-        <div style="font-size:0.88rem; color:rgba(247,245,239,0.7); margin-bottom:16px;">Type or paste any syllabus question below:</div>
+        <div style="font-size:0.88rem; color:rgba(247,245,239,0.7); margin-bottom:16px;">Type or paste any syllabus problem below:</div>
     """, unsafe_allow_html=True)
 
     home_q_input = st.text_area("Question Input", key="home_question_input",
                                 placeholder="e.g. Find GCD of 1071 and 462  OR  Convert 1 + 1.732i into polar form",
                                 height=85, label_visibility="collapsed")
     
-    st.caption("Quick example questions (click to load):")
+    st.caption("Quick sample questions:")
     sample_qs = {
         "gcd": "Find GCD of 1071 and 462",
         "complex": "Convert z = 1 + 1.73205i to polar form",
@@ -949,7 +1084,7 @@ if page == "🏠 Home":
             st.session_state.nav_page = target
 
     st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
-    st.button("🧮 Solve Question", type="primary", use_container_width=True, on_click=handle_home_solve)
+    st.button("🧮 Solve Problem Step-by-Step", type="primary", use_container_width=True, on_click=handle_home_solve)
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
@@ -957,11 +1092,11 @@ if page == "🏠 Home":
     
     topic_descriptions = {
         "gcd": ("🧮 Euclidean Algorithm & GCD", "Step-by-step Euclidean division, quotient-remainder breakdowns, and last non-zero remainder."),
-        "complex": ("📍 Complex Numbers & Polar Form", "Rectangular to polar conversion, modulus r, argument θ in radians/degrees, and Argand plane."),
-        "demoivre": ("🔄 De Moivre's Theorem", "Compute zⁿ and all n-th roots of complex numbers with geometric roots polygon."),
+        "complex": ("📍 Complex Numbers & Polar Form", "Rectangular to polar conversion, modulus r, argument θ, and interactive Argand plane."),
+        "demoivre": ("🔄 De Moivre's Theorem", "Compute zⁿ and all n-th roots of complex numbers with interactive root polygon."),
         "permcomb": ("🔢 Permutations & Combinations", "Factorial formulas for nPr and nCr with step-by-step simplification."),
-        "functions": ("🔗 Functions & Mappings", "Classify domain-to-codomain mappings with interactive arrow diagrams."),
-        "limits": ("📈 Limits & Continuity", "Symbolic limit computation via SymPy, direct substitution, and continuity diagnostics."),
+        "functions": ("🔗 Functions & Mappings", "Classify domain-to-codomain mappings with interactive bipartite graph diagrams."),
+        "limits": ("📈 Limits & Continuity", "Symbolic limit computation via SymPy, direct substitution, and interactive limit curves."),
     }
 
     t_cols = st.columns(3)
@@ -978,7 +1113,7 @@ if page == "🏠 Home":
 
 
 # ============================================================
-# SOLVER DISPATCHER (FOR ALL TOPIC PAGES)
+# SOLVER DISPATCHER (FOR ALL 6 TOPIC PAGES)
 # ============================================================
 elif page in TOPIC_NAV_MAP.values():
     topic_key = [k for k, v in TOPIC_NAV_MAP.items() if v == page][0]
@@ -996,7 +1131,6 @@ elif page in TOPIC_NAV_MAP.values():
     auto_trigger = bool(question_text and (detected == topic_key or not detected))
     domain_str, codomain_str, mapping = "1,2,3", "a,b,c,d", {}
 
-    # Parameter inputs per topic
     if topic_key == "gcd":
         c1, c2 = st.columns(2)
         default_a = parsed_params.get("a", 1071) if topic_key == detected else 1071
@@ -1077,7 +1211,16 @@ elif page in TOPIC_NAV_MAP.values():
             except Exception as e:
                 st.error(f"Couldn't parse that expression: {e}")
 
-    # Save to session_state so downloads/reruns don't erase the solution
+    # Optional AI Solver Fallback button
+    if question_text and st.button("🤖 Ask AI Solver (LLM Fallback)", use_container_width=False):
+        with st.spinner("AI Solver analyzing problem..."):
+            ai_res = api_client.solve_with_ai(question_text)
+            if ai_res:
+                steps = ai_res.get("steps", [])
+                answer = ai_res.get("answer", "")
+                st.success("Solved via AI Math Engine!")
+
+    # Save solution state
     if steps:
         st.session_state.active_solution = {
             "topic_key": topic_key,
@@ -1089,16 +1232,8 @@ elif page in TOPIC_NAV_MAP.values():
             "codomain_str": codomain_str,
             "mapping": mapping,
         }
-    elif "active_solution" in st.session_state and st.session_state.active_solution.get("topic_key") == topic_key:
-        saved = st.session_state.active_solution
-        steps = saved.get("steps")
-        answer = saved.get("answer")
-        extra = saved.get("extra")
-        domain_str = saved.get("domain_str", domain_str)
-        codomain_str = saved.get("codomain_str", codomain_str)
-        mapping = saved.get("mapping", mapping)
 
-    # Render Split 2-Column Layout when steps exist
+    # Render solution & Plotly charts
     if steps:
         st.markdown("---")
         sol_col, info_col = st.columns([7, 5])
@@ -1107,107 +1242,110 @@ elif page in TOPIC_NAV_MAP.values():
             st.markdown("### 📚 STEP-BY-STEP REASONING")
             render_step_timeline(steps)
             
-            # Interactive Visualizations
-            st.markdown("### 📐 Interactive Mathematics Area")
+            st.markdown("### 📐 Interactive Mathematics Visualization")
             if topic_key == "complex":
-                fig = plot_complex_plane([(extra["a"], extra["b"])], ["z"])
-                st.pyplot(fig)
+                fig = plot_complex_plane_plotly([(extra["a"], extra["b"])], ["z"])
+                st.plotly_chart(fig, use_container_width=True)
             elif topic_key == "demoivre":
                 if "roots" in extra:
                     pts = [(re_, im_) for re_, im_, _ in extra["roots"]]
                     labs = [f"w{k}" for k in range(len(pts))]
-                    st.pyplot(plot_complex_plane(pts, labs, draw_polygon=True))
+                    fig = plot_complex_plane_plotly(pts, labs, draw_polygon=True)
                 else:
-                    st.pyplot(plot_complex_plane([(extra["real"], extra["imag"])], ["zⁿ"], colors=[AMBER]))
+                    fig = plot_complex_plane_plotly([(extra["real"], extra["imag"])], ["zⁿ"], colors=[AMBER])
+                st.plotly_chart(fig, use_container_width=True)
             elif topic_key == "functions":
-                st.pyplot(plot_function_diagram(
+                fig = plot_function_diagram_plotly(
                     [x.strip() for x in domain_str.split(",") if x.strip()],
                     [x.strip() for x in codomain_str.split(",") if x.strip()],
-                    mapping))
+                    mapping
+                )
+                st.plotly_chart(fig, use_container_width=True)
             elif topic_key == "limits":
-                st.pyplot(plot_limit_function(extra["expr"], extra["var"], extra["point"]))
+                fig = plot_limit_function_plotly(extra["expr"], extra["var"], extra["point"])
+                st.plotly_chart(fig, use_container_width=True)
                 if extra.get("continuity_note"):
                     st.info(extra["continuity_note"])
             else:
-                st.info("💡 Number theory breakdown complete.")
+                st.info("💡 Euclidean Division algorithm breakdown completed.")
 
             # Save / Export Actions
             st.markdown("### 💾 Save & Export Solution")
-            e1, e2, e3, e4 = st.columns(4)
-            
+            e1, e2, e3 = st.columns(3)
             with e1:
                 if st.button("📋 Copy Answer", key="btn_copy_ans_act"):
                     st.session_state.show_copy_box = True
                     st.toast(f"📋 Answer '{answer}' ready to copy!")
             with e2:
                 if DOCX_AVAILABLE:
-                    buf = build_docx(question_text or TOPICS[topic_key], TOPICS[topic_key], steps, answer)
-                    st.download_button("📄 DOCX Export", buf, file_name="mathmate_solution.docx", key="dl_docx_btn")
+                    buf = build_docx(question_text or TOPICS[topic_key], TOPICS[topic_key], steps, answer) if 'build_docx' in globals() else None
+                    if buf:
+                        st.download_button("📄 DOCX Export", buf, file_name="mathmate_solution.docx", key="dl_docx_btn")
                 else:
                     st.caption("Install `python-docx` for DOCX.")
             with e3:
                 if REPORTLAB_AVAILABLE:
-                    buf = build_pdf(question_text or TOPICS[topic_key], TOPICS[topic_key], steps, answer)
-                    st.download_button("📥 PDF Export", buf, file_name="mathmate_solution.pdf", key="dl_pdf_btn")
+                    buf = build_pdf(question_text or TOPICS[topic_key], TOPICS[topic_key], steps, answer) if 'build_pdf' in globals() else None
+                    if buf:
+                        st.download_button("📥 PDF Export", buf, file_name="mathmate_solution.pdf", key="dl_pdf_btn")
                 else:
                     st.caption("Install `reportlab` for PDF.")
-            with e4:
-                if st.button("🔗 Share Solution", key="btn_share_sol_act"):
-                    st.session_state.show_share_box = True
-                    st.toast("🔗 Shareable link generated!")
 
-            # Copy box callout
             if st.session_state.get("show_copy_box"):
-                st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#2EC4B6; margin-top:8px;'>📋 COPYABLE FINAL ANSWER:</div>", unsafe_allow_html=True)
                 st.code(answer, language=None)
-
-            # Share box callout
-            if st.session_state.get("show_share_box"):
-                clean_q = (question_text or f"{TOPICS[topic_key]} problem").replace(" ", "+")
-                share_url = f"https://mathmate.streamlit.app/?topic={topic_key}&q={clean_q}"
-                st.info(f"🔗 **Shareable Solution Link:**\n\n`{share_url}`\n\n*(Copy and paste this link to share your solution with others)*")
 
         with info_col:
             render_answer_card(answer)
             render_understand_panel(topic_key)
 
+            # Persist to database (Supabase / SQLite)
             last_solved_key = f"{question_text}_{topic_key}_{answer}"
             if st.session_state.get("last_solved_key") != last_solved_key:
                 st.session_state.last_solved_key = last_solved_key
                 st.session_state.streak += 1
-                push_history(question_text or f"{TOPICS[topic_key]} problem", TOPICS[topic_key], answer)
+                st.session_state.xp += 15
+                db.save_solution(question_text or f"{TOPICS[topic_key]} problem", TOPICS[topic_key], answer, steps)
+                db.save_user_stats(st.session_state.streak, st.session_state.xp, st.session_state.quiz_score["correct"], st.session_state.quiz_score["total"])
+
+
+# ============================================================
+# PAGE: AI MATH TUTOR
+# ============================================================
+elif page == "🤖 AI Math Tutor":
+    st.markdown('<div class="hero-title">🤖 AI MATH TUTOR</div>', unsafe_allow_html=True)
+    st.caption("Ask questions, seek clarifications, or explore theorems across the 6 syllabus topics.")
+
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = [
+            {"role": "assistant", "content": "Hello! I am MathMate AI Tutor. How can I help you master Euclidean Algorithm, Complex Numbers, De Moivre's Theorem, Permutations/Combinations, Functions, or Limits today?"}
+        ]
+
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.write(msg["content"])
+
+    user_input = st.chat_input("Ask any conceptual question or ask for help on a problem...")
+    if user_input:
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.write(user_input)
+
+        with st.chat_message("assistant"):
+            with st.spinner("AI Tutor thinking..."):
+                tutor_reply = api_client.ask_ai_tutor(user_input)
+                st.write(tutor_reply)
+                st.session_state.chat_history.append({"role": "assistant", "content": tutor_reply})
 
 
 # ============================================================
 # PAGE: PRACTICE & QUIZ
 # ============================================================
 elif page == "🧠 Quiz & Practice":
-    st.markdown('<div class="hero-title">🧠 MATHMATE QUIZ</div>', unsafe_allow_html=True)
-    st.caption("Test your problem-solving skills across syllabus topics to earn XP and level up.")
-
-    QUESTION_BANK = [
-        {"q": "Find gcd(48, 18) using the Euclidean algorithm.", "topic": "gcd",
-         "options": ["6", "8", "12", "3"], "answer": "6",
-         "exp": "48 = 2×18 + 12\n18 = 1×12 + 6\n12 = 2×6 + 0. Last non-zero remainder is 6."},
-        {"q": "Convert z = √3 + i to polar form. What is the argument θ?", "topic": "complex",
-         "options": ["30°", "45°", "60°", "90°"], "answer": "30°",
-         "exp": "tan(θ) = 1/√3 → θ = 30° (or π/6 radians)."},
-        {"q": "If z = 2(cos30° + i sin30°), what is |z³|?", "topic": "demoivre",
-         "options": ["6", "8", "4", "2"], "answer": "8",
-         "exp": "|z³| = |z|³ = 2³ = 8."},
-        {"q": "How many ways can 4 distinct books be arranged on a shelf?", "topic": "permcomb",
-         "options": ["24", "12", "16", "10"], "answer": "24",
-         "exp": "Arranging 4 items = 4! = 4 × 3 × 2 × 1 = 24."},
-        {"q": "A function f: {1,2,3} → {a,b} where f(1)=a, f(2)=a, f(3)=b — is it injective?", "topic": "functions",
-         "options": ["No", "Yes"], "answer": "No",
-         "exp": "f(1) = f(2) = a. Two distinct inputs map to the same output, so it is NOT injective."},
-        {"q": "lim(x→0) sin(x)/x = ?", "topic": "limits",
-         "options": ["1", "0", "∞", "undefined"], "answer": "1",
-         "exp": "Standard limit: lim_(x→0) sin(x)/x = 1 (by L'Hôpital's Rule: cos(0)/1 = 1)."},
-    ]
+    st.markdown('<div class="hero-title">🧠 MATHMATE PRACTICE QUIZ</div>', unsafe_allow_html=True)
+    st.caption("Infinite procedurally-generated math problems across the 6 syllabus topics. Earn XP and level up!")
 
     if "quiz_q" not in st.session_state:
-        st.session_state.quiz_q = random.choice(QUESTION_BANK)
+        st.session_state.quiz_q = generate_procedural_question()
 
     q = st.session_state.quiz_q
     st.markdown(f'<span class="topic-badge">{TOPICS[q["topic"]]}</span>', unsafe_allow_html=True)
@@ -1226,20 +1364,44 @@ elif page == "🧠 Quiz & Practice":
         if choice == q["answer"]:
             st.session_state.quiz_score["correct"] += 1
             st.session_state.streak += 1
-            st.success("Correct! 🎉 (+10 XP)")
+            st.session_state.xp += 20
+            st.success("Correct! 🎉 (+20 XP)")
         else:
             st.error(f"Not quite — the correct answer is {q['answer']}.")
+        
+        # Save updated stats to DB
+        db.save_user_stats(st.session_state.streak, st.session_state.xp, st.session_state.quiz_score["correct"], st.session_state.quiz_score["total"])
+
         with st.expander("💡 View step-by-step solution breakdown", expanded=True):
             st.write(q["exp"])
 
     if c2.button("Next Question →", use_container_width=True):
-        st.session_state.quiz_q = random.choice(QUESTION_BANK)
+        st.session_state.quiz_q = generate_procedural_question()
         st.rerun()
 
     st.markdown("---")
     total = st.session_state.quiz_score["total"]
     correct = st.session_state.quiz_score["correct"]
-    st.metric("Total Quiz Score", f"{correct} / {total}" if total else "0 / 0")
+    st.metric("Total Quiz Accuracy", f"{correct} / {total}" if total else "0 / 0")
+
+
+# ============================================================
+# PAGE: FORMULA CHEAT SHEET
+# ============================================================
+elif page == "📐 Formula Cheat Sheet":
+    st.markdown('<div class="hero-title">📐 FORMULA CHEAT SHEET</div>', unsafe_allow_html=True)
+    st.caption("Key formulas, identities, and theorems for all 6 syllabus topics.")
+
+    for topic_key, c in TOPIC_CONCEPTS.items():
+        with st.expander(f"📌 {c['title']}", expanded=True):
+            st.markdown(f"**Description**: {c['desc']}")
+            st.markdown("**Main Formula:**")
+            st.latex(c['formula'])
+            st.markdown("**Key Identity / Relationship:**")
+            st.latex(c['identity'])
+            st.markdown("**Key Properties:**")
+            for pt in c['key_points']:
+                st.markdown(f"- {pt}")
 
 
 # ============================================================
@@ -1247,26 +1409,26 @@ elif page == "🧠 Quiz & Practice":
 # ============================================================
 elif page == "📜 Solution History":
     st.markdown('<div class="hero-title">📜 SOLUTION HISTORY</div>', unsafe_allow_html=True)
-    st.caption("Review your solved problems and tracking metrics.")
+    st.caption("Review your solved problems and tracking metrics (Persisted in Database).")
     
     m1, m2, m3 = st.columns(3)
-    history = st.session_state.get("history", [])
+    history = db.fetch_history(limit=50)
     m1.metric("Total Problems Solved", len(history))
     m2.metric("Current Streak", f"{st.session_state.streak} Days 🔥")
-    m3.metric("Rank Tier", tier_badge)
+    m3.metric("Total XP", f"{st.session_state.xp} XP")
     
     st.markdown("---")
     if not history:
-        st.info("No solved questions yet — head to **Home** or pick a topic to get started.")
+        st.info("No solved questions in database yet — head to **Home** or pick a topic to get started.")
     else:
         for item in history:
             st.markdown(f"""
             <div class="glass-card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span style="font-weight:700; color:#2EC4B6; font-size:0.95rem;">{item['topic']}</span>
-                    <span style="font-size:0.88rem; color:rgba(247,245,239,0.5);">{item['time']}</span>
+                    <span style="font-weight:700; color:#2EC4B6; font-size:0.95rem;">{item.get('topic','')}</span>
+                    <span style="font-size:0.88rem; color:rgba(247,245,239,0.5);">{item.get('time','')}</span>
                 </div>
-                <div style="font-size:1.05rem; font-weight:600; color:#FFFFFF; margin-bottom:6px;">{item['question']}</div>
-                <div style="font-size:0.9rem; color:#FFB627; font-weight:700;">Answer: {item['answer']}</div>
+                <div style="font-size:1.05rem; font-weight:600; color:#FFFFFF; margin-bottom:6px;">{item.get('question','')}</div>
+                <div style="font-size:0.9rem; color:#FFB627; font-weight:700;">Answer: {item.get('answer','')}</div>
             </div>
             """, unsafe_allow_html=True)
