@@ -55,6 +55,7 @@ from sympy.parsing.sympy_parser import (
 )
 
 import plotly.graph_objects as go
+# pyrefly: ignore [missing-import]
 import plotly.express as px
 
 # Safe Local Database Import with Fallback
@@ -466,6 +467,16 @@ def format_prime_factorization_plain(factor_dict: dict) -> str:
     return " × ".join(parts)
 
 
+def clean_math_string(text: str) -> str:
+    """Converts raw LaTeX string into clean readable text for HTML cards."""
+    superscripts = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'}
+    t = text.replace(r"\gcd", "gcd").replace(r"\times", "×").replace(r"\cdot", "·").replace(r"\operatorname{lcm}", "lcm").replace(r"\text", "")
+    t = re.sub(r"\^\{(\d+)\}", lambda m: "".join(superscripts.get(c, c) for c in m.group(1)), t)
+    t = re.sub(r"\^(\d)", lambda m: superscripts.get(m.group(1), m.group(1)), t)
+    t = t.replace("{", "").replace("}", "").replace("\\", "").strip()
+    return t
+
+
 def detect_topic(text: str) -> str:
     t = text.lower()
     scores = {k: 0 for k in TOPICS}
@@ -568,11 +579,13 @@ def solve_divisibility(n: int):
                   f"Total Number of Divisors τ({n}) = {tau}\n"
                   f"Sum of Divisors σ({n}) = {sigma}"))
 
-    ans_latex = fr"\text{{gcd factor for }} {n} = {fact_latex} \implies \tau({n}) = {tau}, \ \sigma({n}) = {sigma}"
-    return steps, ans_latex, {
+    ans_str = f"{n} = {fact_plain} | τ({n}) = {tau} | σ({n}) = {sigma}"
+    ans_latex = fr"{n} = {fact_latex} \implies \tau({n}) = {tau}, \ \sigma({n}) = {sigma}"
+    return steps, ans_str, {
         "n": n, "is_prime": is_prime, "factors": factors,
         "divisors": divisors, "tau": tau, "sigma": sigma,
-        "fact_plain": fact_plain, "fact_latex": fact_latex
+        "fact_plain": fact_plain, "fact_latex": fact_latex,
+        "latex_ans": ans_latex
     }
 
 
@@ -648,12 +661,14 @@ def solve_gcd_factorization(a: int, b: int):
 
     steps.append(("GCD & LCM in Prime Factorization Form", fact_block))
 
+    ans_str = f"gcd({orig_a}, {orig_b}) = {plain_fact_gcd} = {gcd_val}"
     ans_latex = fr"\gcd({orig_a}, {orig_b}) = {latex_fact_gcd} = {gcd_val}"
-    return steps, ans_latex, {
+    return steps, ans_str, {
         "gcd": gcd_val, "lcm": lcm_val, "a": a_abs, "b": b_abs,
         "fact_a": fact_a, "fact_b": fact_b, "fact_gcd": fact_gcd, "fact_lcm": fact_lcm,
         "x_bez": x_bez, "y_bez": y_bez, "all_primes": all_primes,
-        "plain_fact_gcd": plain_fact_gcd, "latex_fact_gcd": latex_fact_gcd
+        "plain_fact_gcd": plain_fact_gcd, "latex_fact_gcd": latex_fact_gcd,
+        "latex_ans": ans_latex
     }
 
 
@@ -675,7 +690,7 @@ def solve_linear_congruence(a: int, b: int, m: int):
                     f"d = {d} does NOT divide b = {b_mod} (remainder {b_mod % d}).\n"
                     f"Conclusion: NO SOLUTION exists for {a}x ≡ {b} (mod {m}).")
         steps.append(("Solvability Analysis", fail_msg))
-        return steps, r"\text{No Solution } (\gcd(a,m) \nmid b)", {"solvable": False, "d": d, "solutions": []}
+        return steps, "No Solution", {"solvable": False, "d": d, "solutions": []}
 
     steps.append(("Solvability Analysis", f"PASSED! d = {d} divides b = {b_mod}.\n"
                                          f"Conclusion: Exactly {d} incongruent solution(s) exist modulo {m}."))
@@ -701,11 +716,11 @@ def solve_linear_congruence(a: int, b: int, m: int):
                                                        f"Generated Solutions mod {m}:\n"
                                                        f"x ≡ {sol_str} (mod {m})"))
 
-    ans_latex = sol_latex
-    return steps, ans_latex, {
+    ans_str = f"x ≡ {sol_str} (mod {m})"
+    return steps, ans_str, {
         "solvable": True, "d": d, "a": a, "b": b, "m": m,
         "a_prime": a_prime, "b_prime": b_prime, "m_prime": m_prime,
-        "x0": x0, "solutions": solutions
+        "x0": x0, "solutions": solutions, "latex_ans": sol_latex
     }
 
 
@@ -720,11 +735,11 @@ def solve_complex_to_polar(a: float, b: float):
     quadrant = "Quadrant I" if a >= 0 and b >= 0 else "Quadrant II" if a < 0 and b >= 0 else "Quadrant III" if a < 0 and b < 0 else "Quadrant IV"
     steps.append(("Compute Argument (θ)", f"θ = atan2(b, a) = atan2({b}, {a}) = {theta_rad:.4f} rad ({theta_deg:.2f}°)\nLocated in {quadrant}"))
 
+    polar_str = f"z = {r:.4f} (cos({theta_deg:.2f}°) + i sin({theta_deg:.2f}°))"
     polar_latex = fr"z = {r:.4f} \left(\cos({theta_deg:.2f}^\circ) + i \sin({theta_deg:.2f}^\circ)\right)"
-    euler_latex = fr"z = {r:.4f} e^{{{theta_rad:.4f}i}}"
 
-    steps.append(("Polar & Exponential Forms", f"Polar Form: z = {r:.4f}(cos({theta_deg:.2f}°) + i sin({theta_deg:.2f}°))\nExponential Form: z = {r:.4f} e^({theta_rad:.4f}i)"))
-    return steps, polar_latex, {"r": r, "theta_rad": theta_rad, "theta_deg": theta_deg, "a": a, "b": b, "euler": euler_latex}
+    steps.append(("Polar & Exponential Forms", f"Polar Form: {polar_str}\nExponential Form: z = {r:.4f} e^({theta_rad:.4f}i)"))
+    return steps, polar_str, {"r": r, "theta_rad": theta_rad, "theta_deg": theta_deg, "a": a, "b": b, "latex_ans": polar_latex}
 
 
 def solve_perm(n: int, r: int):
@@ -748,8 +763,9 @@ def solve_perm(n: int, r: int):
                   f"• Circular Permutations of {n} objects around a table: ({n}-1)! = {val_circ}")
     steps.append(("Special Permutation Scenarios", extra_info))
 
+    ans_str = f"P({n}, {r}) = {val_npr}"
     ans_latex = fr"P({n}, {r}) = {val_npr}"
-    return steps, ans_latex, {"val": val_npr, "n": n, "r": r, "n_fact": val_fact, "circular": val_circ}
+    return steps, ans_str, {"val": val_npr, "n": n, "r": r, "n_fact": val_fact, "circular": val_circ, "latex_ans": ans_latex}
 
 
 def solve_comb(n: int, r: int):
@@ -769,8 +785,9 @@ def solve_comb(n: int, r: int):
     comp_r = n - r
     steps.append(("Symmetry Property", f"C({n}, {r}) = C({n}, {comp_r}) = {val_ncr}"))
 
+    ans_str = f"C({n}, {r}) = {val_ncr}"
     ans_latex = fr"\binom{{{n}}}{{{r}}} = C({n}, {r}) = {val_ncr}"
-    return steps, ans_latex, {"val": val_ncr, "n": n, "r": r}
+    return steps, ans_str, {"val": val_ncr, "n": n, "r": r, "latex_ans": ans_latex}
 
 
 def solve_functions(domain: list, codomain: list, mapping: dict):
@@ -804,8 +821,7 @@ def solve_functions(domain: list, codomain: list, mapping: dict):
                      "NEITHER (Neither Injective nor Surjective)"
 
     steps.append(("Final Classification", f"Classification: {classification}"))
-    ans_latex = fr"\text{{{classification}}}"
-    return steps, ans_latex, {"injective": is_injective, "surjective": is_surjective, "bijective": is_bijective, "classification": classification}
+    return steps, classification, {"injective": is_injective, "surjective": is_surjective, "bijective": is_bijective, "classification": classification}
 
 
 def solve_inverse_image(domain: list, codomain: list, mapping: dict, target_set: list):
@@ -825,12 +841,15 @@ def solve_inverse_image(domain: list, codomain: list, mapping: dict, target_set:
     unique_preimages = sorted(list(set(pre_images)))
     steps.append(("Element-by-Element Pre-image Lookup", "\n".join(element_breakdown)))
 
-    pre_str = ', '.join(unique_preimages) if unique_preimages else r'\emptyset'
-    target_str = ', '.join(target_set_clean)
-    ans_latex = fr"f^{{-1}}\left(\{{{target_str}\}}\right) = \{{{pre_str}\}}"
+    pre_str = ', '.join(unique_preimages) if unique_preimages else 'Ø'
+    ans_str = f"f⁻¹({{{', '.join(target_set_clean)}}}) = {{{pre_str}}}"
+
+    latex_pre_str = ', '.join(unique_preimages) if unique_preimages else r'\emptyset'
+    latex_target_str = ', '.join(target_set_clean)
+    ans_latex = fr"f^{{-1}}\left(\{{{latex_target_str}\}}\right) = \{{{latex_pre_str}\}}"
 
     steps.append(("Inverse Image Set Result", f"f⁻¹(S) = {{ x ∈ A | f(x) ∈ S }} = {{{pre_str}}}"))
-    return steps, ans_latex, {"preimages": unique_preimages, "target_set": target_set_clean}
+    return steps, ans_str, {"preimages": unique_preimages, "target_set": target_set_clean, "latex_ans": ans_latex}
 
 
 # ============================================================
@@ -1047,7 +1066,6 @@ def plot_pascals_triangle_plotly(n: int, r: int):
         hoverongaps=False
     ))
 
-    # Highlight selected C(n, r) point
     fig.add_trace(go.Scatter(
         x=[r], y=[n],
         mode='markers+text',
@@ -1306,16 +1324,17 @@ def render_understand_panel(topic_key):
         st.markdown(f"• {pt}")
 
 
-def render_answer_card(answer):
+def render_answer_card(answer: str, latex_ans: str = None):
+    display_ans = clean_math_string(answer)
     st.markdown(f"""
     <div class="answer-card">
         <div class="answer-badge">FINAL ANSWER</div>
+        <div class="answer-value">{display_ans}</div>
+        <div style="font-size:0.82rem; color:#2EC4B6; font-weight:700; margin-top:6px;">✓ Computed & Verified</div>
+    </div>
     """, unsafe_allow_html=True)
-    if any(ch in answer for ch in ['\\', '^', '{', '}']):
-        st.latex(answer)
-    else:
-        st.markdown(f'<div class="answer-value">{answer}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="answer-status" style="font-size:0.8rem; color:#2EC4B6; margin-top:6px;">✓ Computed & Verified</div></div>', unsafe_allow_html=True)
+    if latex_ans:
+        st.latex(latex_ans)
 
 
 def set_nav_page(target_page, preset_q=None):
@@ -1632,7 +1651,7 @@ elif page in TOPIC_NAV_MAP.values():
                 st.info("💡 Computation breakdown completed.")
 
         with info_col:
-            render_answer_card(answer)
+            render_answer_card(answer, latex_ans=extra.get("latex_ans"))
             render_understand_panel(topic_key)
 
             # Persist to database
