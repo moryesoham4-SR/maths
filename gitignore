@@ -1,0 +1,17 @@
+# Streamlit secrets (DO NOT COMMIT API KEYS OR PASSWORDS TO GITHUB)
+.streamlit/secrets.toml
+
+# SQLite local database
+*.db
+mathmate.db
+
+# Python cache & virtual environment
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# OS metadata
+.DS_Store
+Thumbs.db
