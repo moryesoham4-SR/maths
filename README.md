@@ -1,38 +1,45 @@
-# MathMate — Interactive Mathematics Lab
+# MathMate — Interactive Mathematics Lab 🧮
 
-Streamlit app covering six syllabus topics with step-by-step solutions:
+Streamlit application covering **6 core syllabus topics** with step-by-step reasoning, interactive Plotly visualizations, AI math tutoring, persistent database history, and procedural practice quizzes:
 
-- 🧮 Euclidean Algorithm & GCD
-- 📍 Complex Numbers & Polar Form
-- 🔄 De Moivre's Theorem (powers + n-th roots)
-- 🔢 Permutations & Combinations
-- 🔗 Injective, Surjective & Bijective Functions
-- 📈 Limits & Continuity (symbolic, via SymPy)
+1. 🧮 **Euclidean Algorithm & GCD**
+2. 📍 **Complex Numbers & Polar Form**
+3. 🔄 **De Moivre's Theorem (powers & n-th roots)**
+4. 🔢 **Permutations & Combinations**
+5. 🔗 **Injective, Surjective & Bijective Functions**
+6. 📈 **Limits & Continuity (symbolic via SymPy)**
 
-## Run locally
+---
+
+## Features
+
+- **Step-by-Step Solvers**: Detailed quotient-remainder breakdowns, Argand conversions, permutation factorials, function mappings, and symbolic limits.
+- **Interactive Visualizations**: Dynamic Plotly Argand planes, roots polygons, bipartite mapping diagrams, and limit curves.
+- **Supabase Persistence**: Cloud storage for solution history, streak tracking, XP points, and quiz metrics (with local SQLite fallback).
+- **AI Solver & Tutor**: LLM fallback for natural language problems and an interactive AI Math Tutor chat.
+- **Procedural Quiz Engine**: Infinite variable-randomized practice problems.
+- **Formula Cheat Sheet**: Comprehensive reference cards with LaTeX expressions.
+
+---
+
+## Run Locally
 
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
+---
+
 ## Deploy to Streamlit Cloud
 
-1. Push `app.py` and `requirements.txt` to your GitHub repo (e.g. `mathmate-ai`).
-2. On Streamlit Cloud, point the app at `app.py`.
+1. Push code to your GitHub repository.
+2. In **Streamlit Cloud Settings** $\to$ **Secrets**, paste your credentials:
 
-## Notes on the current build
+```toml
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_KEY = "your-supabase-key"
+NVIDIA_API_KEY = "your-nvidia-key" # Optional for AI Tutor
+```
 
-- **Topic detection** is keyword-based (see `TOPIC_KEYWORDS` in `app.py`).
-  It's intentionally simple/fast — swap in an LLM call there later if you
-  want smarter detection on messier inputs.
-- **Exports**: DOCX via `python-docx`, PDF via `reportlab`. Both are optional
-  imports — if either package is missing, that download button is hidden
-  with a note instead of breaking the app.
-- **Share link** and **Copy** buttons are UI stubs — wire them to your own
-  backend / clipboard JS component when ready.
-- **Quiz** question bank is a small static list in `app.py` (`QUESTION_BANK`)
-  — easy to expand or move to a JSON/DB file later.
-- **History** and **streak** are stored in `st.session_state`, so they reset
-  per session. Hook up Supabase (like your other projects) if you want
-  persistent history across logins.
+3. Set `app.py` as the main file path.
