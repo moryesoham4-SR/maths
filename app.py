@@ -17,6 +17,15 @@ Features:
 - Formula & Concept Cheat Sheet reference page
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Ensure root directory is on Python path for Streamlit Cloud deployment
+ROOT_DIR = Path(__file__).parent.resolve()
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import io
 import re
 import math
@@ -37,8 +46,15 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 # Local Database & API client imports
-import db
-import api_client
+try:
+    import db
+except ModuleNotFoundError:
+    from . import db
+
+try:
+    import api_client
+except ModuleNotFoundError:
+    from . import api_client
 
 # Optional export libs — degrade gracefully
 try:
@@ -653,10 +669,8 @@ def solve_limit(expr_str: str, var_str: str, point_str: str):
 def plot_complex_plane_plotly(points: list, labels: list, colors: list = None, draw_polygon: bool = False):
     fig = go.Figure()
 
-    # Determine scale
     max_r = max([math.hypot(x, y) for x, y in points] + [2.0]) * 1.25
     
-    # Unit circle & coordinate axes
     t_vals = np.linspace(0, 2*np.pi, 200)
     fig.add_trace(go.Scatter(
         x=max_r * 0.8 * np.cos(t_vals), y=max_r * 0.8 * np.sin(t_vals),
@@ -664,11 +678,9 @@ def plot_complex_plane_plotly(points: list, labels: list, colors: list = None, d
         hoverinfo='skip', showlegend=False
     ))
 
-    # Grid axes
     fig.add_shape(type="line", x0=-max_r, y0=0, x1=max_r, y1=0, line=dict(color="rgba(255,255,255,0.3)", width=1.5))
     fig.add_shape(type="line", x0=0, y0=-max_r, x1=0, y1=max_r, line=dict(color="rgba(255,255,255,0.3)", width=1.5))
 
-    # Polygon connecting roots if requested
     if draw_polygon and len(points) > 1:
         px_coords = [p[0] for p in points] + [points[0][0]]
         py_coords = [p[1] for p in points] + [points[0][1]]
@@ -679,21 +691,18 @@ def plot_complex_plane_plotly(points: list, labels: list, colors: list = None, d
             name='Roots Polygon'
         ))
 
-    # Scatter points & vectors
     for i, (re_, im_) in enumerate(points):
         lbl = labels[i] if i < len(labels) else f"z{i}"
         col = colors[i] if colors and i < len(colors) else AMBER
         r_val = math.hypot(re_, im_)
         ang_deg = math.degrees(math.atan2(im_, re_))
 
-        # Vector line from origin
         fig.add_trace(go.Scatter(
             x=[0, re_], y=[0, im_],
             mode='lines', line=dict(color=col, width=2.5),
             hoverinfo='skip', showlegend=False
         ))
 
-        # Point marker
         fig.add_trace(go.Scatter(
             x=[re_], y=[im_],
             mode='markers+text',
@@ -728,7 +737,6 @@ def plot_function_diagram_plotly(domain: list, codomain: list, mapping: dict):
     d_pos = {elem: (0, d_y[i]) for i, elem in enumerate(domain)}
     c_pos = {elem: (1, c_y[i]) for i, elem in enumerate(codomain)}
 
-    # Draw mapping arrows
     for dom_elem, codom_elem in mapping.items():
         if dom_elem in d_pos and codom_elem in c_pos:
             x0, y0 = d_pos[dom_elem]
@@ -739,7 +747,6 @@ def plot_function_diagram_plotly(domain: list, codomain: list, mapping: dict):
                 hoverinfo='skip', showlegend=False
             ))
 
-    # Domain nodes
     dx = [pos[0] for pos in d_pos.values()]
     dy = [pos[1] for pos in d_pos.values()]
     dtxt = [str(k) for k in d_pos.keys()]
@@ -752,7 +759,6 @@ def plot_function_diagram_plotly(domain: list, codomain: list, mapping: dict):
         name="Domain A"
     ))
 
-    # Codomain nodes
     cx = [pos[0] for pos in c_pos.values()]
     cy = [pos[1] for pos in c_pos.values()]
     ctxt = [str(k) for k in c_pos.keys()]
@@ -804,14 +810,12 @@ def plot_limit_function_plotly(expr, var, point):
         except Exception:
             y_vals.append(np.nan)
 
-    # Plot function curve
     fig.add_trace(go.Scatter(
         x=x_vals, y=y_vals,
         mode='lines', line=dict(color=TEAL, width=3),
         name=f"f({var}) = {expr}"
     ))
 
-    # Add limit evaluation point marker
     try:
         target_y = float(limit(expr, var, point))
         fig.add_trace(go.Scatter(
@@ -1002,7 +1006,6 @@ st.sidebar.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Supabase status indicator
 if db.is_supabase_connected():
     st.sidebar.markdown('<div class="db-status-badge" style="background:rgba(46,196,182,0.2); color:#2EC4B6; border:1px solid #2EC4B6;">🟢 Supabase Cloud Active</div>', unsafe_allow_html=True)
 else:
