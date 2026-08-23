@@ -34,6 +34,17 @@ import json
 from datetime import datetime
 
 import streamlit as st
+
+# ============================================================
+# PAGE CONFIG (MUST BE THE FIRST STREAMLIT COMMAND EXECUTED)
+# ============================================================
+st.set_page_config(
+    page_title="MathMate — Interactive Mathematics Lab",
+    page_icon="🧮",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import numpy as np
 import matplotlib.pyplot as plt
 import sympy as sp
@@ -90,15 +101,8 @@ except Exception:
 
 
 # ============================================================
-# PAGE CONFIG & STYLES
+# STYLES & COLOR PALETTE
 # ============================================================
-st.set_page_config(
-    page_title="MathMate — Interactive Mathematics Lab",
-    page_icon="🧮",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 INK = "#14213D"
 PAPER = "#F7F5EF"
 TEAL = "#2EC4B6"
@@ -1022,6 +1026,20 @@ def set_nav_page(target_page, preset_q=None):
     st.session_state.nav_page = target_page
     if preset_q:
         st.session_state.preset_question = preset_q
+
+
+# ============================================================
+# INITIALIZE PERSISTENT USER STATS FROM DATABASE
+# ============================================================
+if "stats_loaded" not in st.session_state:
+    db_stats = db.load_user_stats()
+    st.session_state.streak = db_stats.get("streak", 0)
+    st.session_state.xp = db_stats.get("xp", 0)
+    st.session_state.quiz_score = {
+        "correct": db_stats.get("quiz_correct", 0),
+        "total": db_stats.get("quiz_total", 0)
+    }
+    st.session_state.stats_loaded = True
 
 
 # ============================================================
