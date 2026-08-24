@@ -1010,6 +1010,9 @@ def render_answer_card(answer):
         <div class="answer-status">✓ Computed & Verified</div>
     </div>
     """, unsafe_allow_html=True)
+    st.markdown("**📋 Quick Copy Answer:**")
+    st.code(answer, language=None)
+
 
 
 def set_nav_page(target_page, preset_q=None):
@@ -1055,7 +1058,6 @@ NAV_PAGES = [
     "🔢 Permutations & Combinations",
     "🔗 Functions & Mappings",
     "📈 Limits & Continuity",
-    "🤖 AI Math Tutor",
     "🧠 Quiz & Practice",
     "📐 Formula Cheat Sheet",
     "📜 Solution History"
@@ -1086,7 +1088,7 @@ if st.session_state.quiz_score["total"] > 0:
 if page == "🏠 Home":
     st.markdown('<div class="hero-symbol-banner">∫   Σ   √   π   ∞</div>', unsafe_allow_html=True)
     st.markdown('<div class="hero-title">MATHMATE</div>', unsafe_allow_html=True)
-    st.markdown('<div class="hero-subtitle">Interactive Mathematics Lab · 6 Core Syllabus Topics • AI Assisted • Persistent History</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-subtitle">Interactive Mathematics Lab · 6 Core Syllabus Topics • Persistent History</div>', unsafe_allow_html=True)
     
     st.markdown("""
     <div class="glass-card" style="padding: 26px; border: 1px solid rgba(46, 196, 182, 0.35);">
@@ -1267,16 +1269,9 @@ elif page in TOPIC_NAV_MAP.values():
             except Exception as e:
                 st.error(f"Couldn't parse that expression: {e}")
 
-    # Optional AI Solver Fallback button
-    if question_text and st.button("🤖 Ask AI Solver (LLM Fallback)", use_container_width=False):
-        with st.spinner("AI Solver analyzing problem..."):
-            ai_res = api_client.solve_with_ai(question_text)
-            if ai_res:
-                steps = ai_res.get("steps", [])
-                answer = ai_res.get("answer", "")
-                st.success("Solved via AI Math Engine!")
 
-    # Save solution state
+
+    # Save solution state if new steps were calculated
     if steps:
         st.session_state.active_solution = {
             "topic_key": topic_key,
@@ -1288,6 +1283,15 @@ elif page in TOPIC_NAV_MAP.values():
             "codomain_str": codomain_str,
             "mapping": mapping,
         }
+    elif "active_solution" in st.session_state:
+        act = st.session_state.active_solution
+        if act.get("topic_key") == topic_key:
+            steps = act.get("steps")
+            answer = act.get("answer")
+            extra = act.get("extra", {})
+            domain_str = act.get("domain_str", domain_str)
+            codomain_str = act.get("codomain_str", codomain_str)
+            mapping = act.get("mapping", mapping)
 
     # Render solution & Plotly charts
     if steps:
@@ -1331,7 +1335,7 @@ elif page in TOPIC_NAV_MAP.values():
             with e1:
                 if st.button("📋 Copy Answer", key="btn_copy_ans_act"):
                     st.session_state.show_copy_box = True
-                    st.toast(f"📋 Answer '{answer}' ready to copy!")
+                    st.toast(f"📋 Answer ready to copy below!")
             with e2:
                 if DOCX_AVAILABLE:
                     buf = build_docx(question_text or TOPICS[topic_key], TOPICS[topic_key], steps, answer) if 'build_docx' in globals() else None
@@ -1349,6 +1353,7 @@ elif page in TOPIC_NAV_MAP.values():
 
             if st.session_state.get("show_copy_box"):
                 st.code(answer, language=None)
+
 
         with info_col:
             render_answer_card(answer)
@@ -1462,4 +1467,3 @@ elif page == "📜 Solution History":
                 <div style="font-size:0.9rem; color:#FFB627; font-weight:700;">Answer: {item.get('answer','')}</div>
             </div>
             """, unsafe_allow_html=True)
-
