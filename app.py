@@ -5,14 +5,13 @@ Structured according to Syllabus Requirements:
 UNIT I: Practical based on basics of integers, real numbers and complex numbers
   1. Integers and Divisibility (Prime Factorization, Divisors, Primality)
   2. Computation of greatest common divisor using Euclid’s algorithm
-  3. Solutions of Linear Congruences (ax ≡ b mod m)
-  4. Complex Numbers & Polar Form
+  3. Complex Numbers & Polar Form
 
 UNIT II: Practical based on Introduction to basic counting and basics of functions
-  5. Permutations of Distinct Objects (n!, P(n,r), Circular)
-  6. Combinations of Distinct Objects (C(n,r), Binomial)
-  7. Injective, Bijective, Surjective Functions
-  8. Inverse Images of Sets under Functions (f⁻¹(S))
+  4. Permutations of Distinct Objects (n!, P(n,r), Circular)
+  5. Combinations of Distinct Objects (C(n,r), Binomial)
+  6. Injective, Bijective, Surjective Functions
+  7. Inverse Images of Sets under Functions (f⁻¹(S))
 """
 
 import sys
@@ -44,24 +43,15 @@ st.set_page_config(
 )
 
 import numpy as np
-import matplotlib.pyplot as plt
-import sympy as sp
-from sympy import (
-    symbols, sympify, limit, oo, latex, I, re as s_re, im as s_im, Rational,
-    factorint, gcd as sp_gcd, lcm as sp_lcm, gcdex, mod_inverse, solve as sp_solve
-)
-from sympy.parsing.sympy_parser import (
-    parse_expr, standard_transformations, implicit_multiplication_application,
-)
-
 import plotly.graph_objects as go
-import plotly.express as px
+import sympy as sp
+from sympy import factorint, gcdex, mod_inverse
 
-# Safe Local Database Import with Fallback
-try:
-    import db
-except Exception:
+import database as db
+if not hasattr(db, "init_db"):
     class DummyDB:
+        @staticmethod
+        def init_db(): pass
         @staticmethod
         def is_supabase_connected(): return False
         @staticmethod
@@ -69,9 +59,9 @@ except Exception:
         @staticmethod
         def fetch_history(*args, **kwargs): return []
         @staticmethod
-        def load_user_stats(): return {"streak": 0, "xp": 0, "quiz_correct": 0, "quiz_total": 0}
-        @staticmethod
         def save_user_stats(*args, **kwargs): pass
+        @staticmethod
+        def fetch_user_stats(): return 0, 0, 0, 0
     db = DummyDB
 
 # Pure Mathematical Solver Engine (No AI/LLM Dependencies)
@@ -104,199 +94,221 @@ GRAPHITE = "#4A4E69"
 
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+    
+    html, body, [class*="css"] {{
+        font-family: 'Outfit', sans-serif;
+        background-color: #0A1226;
+        color: #F7F5EF;
+    }}
+    
+    .main .block-container {{
+        padding-top: 1.8rem;
+        padding-bottom: 3rem;
+        max-width: 1350px;
+    }}
+    
+    .stApp {{
+        background: radial-gradient(circle at 10% 20%, rgba(20, 33, 61, 0.95) 0%, rgba(10, 18, 38, 1) 90%);
+    }}
+    
+    [data-testid="stSidebar"] {{
+        background: #0D1B2A !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.08);
+    }}
+    
+    .hero-title {{
+        font-size: 2.8rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #FFFFFF 0%, #2EC4B6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.2rem;
+        letter-spacing: -0.02em;
+    }}
+    
+    .hero-subtitle {{
+        font-size: 1.05rem;
+        color: rgba(247, 245, 239, 0.75);
+        font-weight: 400;
+        margin-bottom: 1.5rem;
+    }}
+    
+    .glass-card {{
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 16px;
+        padding: 22px;
+        margin-bottom: 18px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25);
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }}
+    
+    .glass-card:hover {{
+        border-color: rgba(46, 196, 182, 0.35);
+    }}
+    
+    .topic-badge {{
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        background: rgba(46, 196, 182, 0.15);
+        color: #2EC4B6;
+        border: 1px solid rgba(46, 196, 182, 0.3);
+        margin-bottom: 8px;
+    }}
+    
+    .timeline-step {{
+        display: flex;
+        align-items: flex-start;
+        margin-bottom: 14px;
+        position: relative;
+    }}
+    
+    .timeline-num {{
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #2EC4B6;
+        color: #0A1226;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+        margin-right: 14px;
+        box-shadow: 0 0 12px rgba(46, 196, 182, 0.4);
+    }}
+    
+    .timeline-content {{
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 14px 18px;
+        width: 100%;
+    }}
+    
+    .timeline-title {{
+        font-weight: 700;
+        color: #FFFFFF;
+        font-size: 1.05rem;
+        margin-bottom: 4px;
+    }}
+    
+    .timeline-body {{
+        font-size: 0.92rem;
+        color: rgba(247, 245, 239, 0.85);
+        line-height: 1.5;
+        white-space: pre-wrap;
+    }}
+    
+    .answer-card {{
+        background: linear-gradient(135deg, rgba(46, 196, 182, 0.2) 0%, rgba(20, 33, 61, 0.4) 100%);
+        border: 2px solid #2EC4B6;
+        border-radius: 16px;
+        padding: 24px;
+        text-align: center;
+        margin-top: 15px;
+        box-shadow: 0 10px 30px rgba(46, 196, 182, 0.2);
+    }}
+    
+    .answer-badge {{
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        color: #2EC4B6;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }}
+    
+    .answer-value {{
+        font-size: 1.9rem;
+        font-weight: 800;
+        color: #FFFFFF;
+        font-family: 'JetBrains Mono', monospace;
+    }}
+    
+    .understand-card {{
+        background: rgba(255, 182, 39, 0.06);
+        border: 1px solid rgba(255, 182, 39, 0.25);
+        border-radius: 14px;
+        padding: 18px;
+        margin-top: 20px;
+    }}
+    
+    .understand-title {{
+        color: #FFB627;
+        font-weight: 700;
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }}
+    
+    div[data-baseweb="select"] > div {{
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+        color: #FFFFFF !important;
+        border-radius: 8px !important;
+    }}
+    
+    .stButton > button {{
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }}
+    
+    .stButton > button[kind="primary"] {{
+        background: linear-gradient(135deg, #2EC4B6 0%, #1B9AAA 100%);
+        border: none;
+        box-shadow: 0 4px 15px rgba(46, 196, 182, 0.3);
+    }}
+    
+    .stButton > button[kind="primary"]:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(46, 196, 182, 0.45);
+    }}
+    
+    .hero-symbol-banner {{
+        font-size: 2.2rem;
+        opacity: 0.15;
+        letter-spacing: 0.8rem;
+        user-select: none;
+        margin-bottom: -10px;
+    }}
 
-html, body, [class*="css"] {{
-    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-}}
-
-.stApp {{
-    background: radial-gradient(circle at 15% 15%, #182848 0%, #0b132b 60%, #060b18 100%);
-}}
-
-h1, h2, h3, h4, h5, h6, p, span, label, .stMarkdown {{
-    color: {PAPER};
-}}
-
-.hero-symbol-banner {{
-    font-size: 1.3rem;
-    letter-spacing: 0.35em;
-    color: rgba(46, 196, 182, 0.65);
-    font-weight: 700;
-    margin-bottom: 2px;
-    text-shadow: 0 0 12px rgba(46, 196, 182, 0.3);
-}}
-
-.hero-title {{
-    background: linear-gradient(135deg, #FFFFFF 0%, {TEAL} 50%, {AMBER} 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    font-size: 2.8rem;
-    font-weight: 800;
-    margin-bottom: 0.2rem;
-    letter-spacing: -0.02em;
-}}
-
-.hero-subtitle {{
-    color: rgba(247, 245, 239, 0.75);
-    font-size: 1.1rem;
-    font-weight: 400;
-    margin-bottom: 1.5rem;
-}}
-
-.glass-card {{
-    background: rgba(255, 255, 255, 0.04);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 16px;
-    padding: 22px;
-    margin: 12px 0;
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25);
-}}
-
-.glass-card:hover {{
-    transform: translateY(-4px);
-    border-color: rgba(46, 196, 182, 0.45);
-    box-shadow: 0 12px 35px 0 rgba(46, 196, 182, 0.18);
-}}
-
-.timeline-step {{
-    display: flex;
-    align-items: flex-start;
-    background: rgba(247, 245, 239, 0.03);
-    border: 1px solid rgba(247, 245, 239, 0.1);
-    border-radius: 14px;
-    padding: 16px 20px;
-    margin: 6px 0;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-}}
-
-.timeline-num {{
-    background: linear-gradient(135deg, {TEAL} 0%, #1c988b 100%);
-    color: #080e1e;
-    font-weight: 800;
-    font-size: 1.05rem;
-    min-width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: 16px;
-    box-shadow: 0 0 12px rgba(46, 196, 182, 0.4);
-    flex-shrink: 0;
-}}
-
-.timeline-content {{
-    flex-grow: 1;
-}}
-
-.timeline-title {{
-    color: {TEAL};
-    font-weight: 700;
-    font-size: 0.9rem;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    margin-bottom: 4px;
-}}
-
-.timeline-body {{
-    color: rgba(247, 245, 239, 0.9);
-    font-size: 0.95rem;
-    line-height: 1.45;
-    white-space: pre-line;
-}}
-
-.answer-card {{
-    background: linear-gradient(135deg, rgba(46, 196, 182, 0.15) 0%, rgba(255, 182, 39, 0.1) 100%);
-    border: 2px solid {TEAL};
-    border-radius: 16px;
-    padding: 20px;
-    text-align: center;
-    box-shadow: 0 8px 30px rgba(46, 196, 182, 0.25);
-    margin-bottom: 20px;
-}}
-
-.answer-badge {{
-    font-size: 0.82rem;
-    font-weight: 800;
-    color: {AMBER};
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-}}
-
-.answer-value {{
-    font-size: 1.4rem;
-    font-weight: 800;
-    color: #FFFFFF;
-    margin-bottom: 8px;
-    word-break: break-word;
-}}
-
-.understand-card {{
-    background: rgba(11, 19, 43, 0.75);
-    border: 1px solid rgba(255, 182, 39, 0.35);
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 20px;
-    box-shadow: 0 6px 25px rgba(0,0,0,0.25);
-}}
-
-.understand-title {{
-    color: {AMBER};
-    font-weight: 800;
-    font-size: 0.85rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 10px;
-}}
-
-.topic-badge {{
-    display: inline-flex;
-    align-items: center;
-    background: linear-gradient(135deg, rgba(255, 182, 39, 0.2) 0%, rgba(230, 57, 70, 0.15) 100%);
-    color: {AMBER};
-    border: 1px solid rgba(255, 182, 39, 0.5);
-    border-radius: 999px;
-    padding: 6px 16px;
-    font-size: 0.85rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    box-shadow: 0 4px 15px rgba(255, 182, 39, 0.15);
-    margin-bottom: 12px;
-}}
-
-.db-status-badge {{
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 12px;
-    display: inline-block;
-    margin-bottom: 12px;
-}}
-
-[data-testid="stSidebar"] {{
-    background-color: #07111F;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-}}
+    .db-status-badge {{
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-bottom: 12px;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
 
 # ============================================================
-# INITIALIZE PERSISTENT USER STATS FROM DATABASE
+# STATE INITIALIZATION
 # ============================================================
-if "stats_loaded" not in st.session_state:
-    db_stats = db.load_user_stats()
-    st.session_state.streak = db_stats.get("streak", 0)
-    st.session_state.xp = db_stats.get("xp", 0)
-    st.session_state.quiz_score = {
-        "correct": db_stats.get("quiz_correct", 0),
-        "total": db_stats.get("quiz_total", 0)
-    }
+db.init_db()
+
+if "streak" not in st.session_state or "xp" not in st.session_state:
+    st_streak, st_xp, st_quiz_corr, st_quiz_tot = db.fetch_user_stats()
+    st.session_state.streak = max(st_streak, 1)
+    st.session_state.xp = st_xp
+    st.session_state.quiz_score = {"correct": st_quiz_corr, "total": st_quiz_tot}
     st.session_state.stats_loaded = True
 
 
@@ -307,7 +319,6 @@ TOPICS = {
     # UNIT I
     "divisibility": "🔢 Integers & Divisibility",
     "gcd": "🧮 Computation of GCD using Euclid’s Algorithm",
-    "congruence": "⚖️ Solutions of Linear Congruences",
     "complex": "📍 Complex Numbers & Polar Form",
     # UNIT II
     "perm": "🔀 Permutations of Distinct Objects",
@@ -319,7 +330,6 @@ TOPICS = {
 TOPIC_NAV_MAP = {
     "divisibility": "🔢 Integers & Divisibility",
     "gcd": "🧮 Computation of GCD using Euclid’s Algorithm",
-    "congruence": "⚖️ Solutions of Linear Congruences",
     "complex": "📍 Complex Numbers & Polar Form",
     "perm": "🔀 Permutations of Distinct Objects",
     "comb": "🎲 Combinations of Distinct Objects",
@@ -330,7 +340,6 @@ TOPIC_NAV_MAP = {
 TOPIC_KEYWORDS = {
     "divisibility": ["divisibility", "prime factor", "factorization", "divisors", "prime test", "is prime", "factors of"],
     "gcd": ["gcd", "hcf", "euclidean", "euclid", "greatest common divisor", "euclid's algorithm", "highest common factor", "bezout"],
-    "congruence": ["congruence", "congruences", "mod", "modulo", "ax = b mod", "linear congruence", "ax ≡ b"],
     "complex": ["polar form", "modulus", "argument", "rectangular form", "complex number", "argand", "imaginary", "real part"],
     "perm": ["permutation", "permutations", "arrange", "arrangement", "order", "sequence", "line", "row", "npr", "circular permutation"],
     "comb": ["combination", "combinations", "choose", "chosen", "select", "selection", "committee", "team", "pool", "ncr", "ways to choose"],
@@ -361,10 +370,6 @@ TOPIC_CONCEPTS = {
             "Bézout's Identity: Extended Euclidean algorithm finds integers x, y satisfying ax + by = gcd(a,b)."
         ]
     },
-    "congruence": {
-        "title": "Linear Congruences",
-        "desc": "A linear congruence ax ≡ b (mod m) asks for integer x such that m divides (ax - b).",
-        "formula": r"a x \equiv b \pmod m",
         "identity": r"d = \gcd(a, m) \mid b \iff \text{Solvable with } d \text{ solutions modulo } m",
         "key_points": [
             "Solvability Condition: d = gcd(a, m) must divide b.",
@@ -524,15 +529,15 @@ def parse_question(text: str):
     elif topic == "divisibility":
         n = nums[0] if len(nums) >= 1 else 360
         return topic, {"n": abs(n)}
-    elif topic == "congruence":
-        a = nums[0] if len(nums) >= 1 else 14
-        b = nums[1] if len(nums) >= 2 else 12
-        m = nums[2] if len(nums) >= 3 else 18
-        return topic, {"a": a, "b": b, "m": m}
     elif topic == "complex":
         a, b = extract_complex_parts(text)
         return topic, {"a": a, "b": b}
     elif topic in ["perm", "comb"]:
+        n = max(nums[0], nums[1]) if len(nums) >= 2 else nums[0] if len(nums) == 1 else 7
+        r = min(nums[0], nums[1]) if len(nums) >= 2 else 3
+        return topic, {"n": abs(n), "r": abs(r)}
+    return topic, {}
+
         n = max(nums[0], nums[1]) if len(nums) >= 2 else nums[0] if len(nums) == 1 else 7
         r = min(nums[0], nums[1]) if len(nums) >= 2 else 3
         return topic, {"n": abs(n), "r": abs(r)}
@@ -701,56 +706,7 @@ def solve_gcd_euclidean(a: int, b: int):
     }
 
 
-def solve_linear_congruence(a: int, b: int, m: int):
-    """UNIT I: Solutions of linear congruences ax ≡ b (mod m)."""
-    if m <= 0:
-        return [("Validation Error", "Modulus m must be a positive integer.")], "Invalid m", {}
 
-    steps = []
-    a_mod = a % m
-    b_mod = b % m
-    steps.append(("Linear Congruence Formulation", f"Solve: {a}x ≡ {b} (mod {m})  →  Simplified: {a_mod}x ≡ {b_mod} (mod {m})"))
-
-    d = math.gcd(a_mod, m)
-    steps.append(("GCD Check d = gcd(a, m)", f"d = gcd({a_mod}, {m}) = {d}"))
-
-    if b_mod % d != 0:
-        fail_msg = (f"Solvability Condition FAILED!\n"
-                    f"d = {d} does NOT divide b = {b_mod} (remainder {b_mod % d}).\n"
-                    f"Conclusion: NO SOLUTION exists for {a}x ≡ {b} (mod {m}).")
-        steps.append(("Solvability Analysis", fail_msg))
-        return steps, "No Solution", {"solvable": False, "d": d, "solutions": []}
-
-    steps.append(("Solvability Analysis", f"PASSED! d = {d} divides b = {b_mod}.\n"
-                                         f"Conclusion: Exactly {d} incongruent solution(s) exist modulo {m}."))
-
-    a_prime = a_mod // d
-    b_prime = b_mod // d
-    m_prime = m // d
-
-    steps.append(("Equation Reduction by d", f"Dividing by d = {d}:\n"
-                                            f"({a_mod}/{d})x ≡ ({b_mod}/{d}) (mod {m}/{d})  →  {a_prime}x ≡ {b_prime} (mod {m_prime})"))
-
-    inv_a = mod_inverse(a_prime, m_prime)
-    x0 = (inv_a * b_prime) % m_prime
-
-    steps.append(("Modular Inverse & Base Solution", f"Modular Inverse: ({a_prime})⁻¹ ≡ {inv_a} (mod {m_prime})\n"
-                                                     f"Particular Base Solution: x₀ ≡ ({inv_a} × {b_prime}) mod {m_prime} = {x0}"))
-
-    solutions = [(x0 + k * m_prime) % m for k in range(d)]
-    sol_str = ", ".join(str(s) for s in solutions)
-    sol_latex = r" \quad \text{or} \quad ".join(f"x \equiv {s} \pmod{{{m}}}" for s in solutions)
-
-    steps.append(("All Incongruent Solutions Modulo m", f"Formula: xₖ = x₀ + k · (m/d)  for k = 0, 1, ..., {d-1}\n"
-                                                       f"Generated Solutions mod {m}:\n"
-                                                       f"x ≡ {sol_str} (mod {m})"))
-
-    ans_str = f"x ≡ {sol_str} (mod {m})"
-    return steps, ans_str, {
-        "solvable": True, "d": d, "a": a, "b": b, "m": m,
-        "a_prime": a_prime, "b_prime": b_prime, "m_prime": m_prime,
-        "x0": x0, "solutions": solutions, "latex_ans": sol_latex
-    }
 
 
 def solve_complex_to_polar(a: float, b: float):
@@ -1186,6 +1142,85 @@ def format_full_solution_text(question_text: str, topic_name: str, steps: list, 
     return "\n".join(lines)
 
 
+def build_docx(question_text: str, topic_name: str, steps: list, answer: str) -> io.BytesIO:
+    if not DOCX_AVAILABLE:
+        return None
+    doc = Document()
+    doc.add_heading('MathMate — Interactive Mathematics Lab', level=0)
+    doc.add_heading(f'Topic: {topic_name}', level=2)
+    if question_text:
+        doc.add_paragraph(f'Question: {question_text}')
+    
+    doc.add_heading('Step-by-Step Reasoning:', level=2)
+    if steps:
+        for i, step in enumerate(steps, 1):
+            if isinstance(step, (tuple, list)) and len(step) >= 2:
+                title, body = step[0], step[1]
+            else:
+                title, body = f'Step {i}', str(step)
+            clean_title = re.sub(r'<[^>]+>', '', str(title))
+            clean_body = re.sub(r'<[^>]+>', '', str(body))
+            p = doc.add_paragraph()
+            p.add_run(f'Step {i}: {clean_title}\n').bold = True
+            p.add_run(f'{clean_body.strip()}\n')
+            
+    doc.add_heading('Final Answer:', level=2)
+    clean_ans = re.sub(r'<[^>]+>', '', str(answer))
+    p_ans = doc.add_paragraph()
+    p_ans.add_run(f'{clean_ans.strip()}').bold = True
+    
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf
+
+
+def build_pdf(question_text: str, topic_name: str, steps: list, answer: str) -> io.BytesIO:
+    if not REPORTLAB_AVAILABLE:
+        return None
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    title_style = styles['Heading1']
+    subtitle_style = styles['Heading2']
+    body_style = styles['Normal']
+    
+    story.append(Paragraph("<b>MathMate — Interactive Mathematics Lab</b>", title_style))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(f"<b>Topic:</b> {topic_name}", subtitle_style))
+    story.append(Spacer(1, 10))
+    
+    if question_text:
+        clean_q = re.sub(r'<[^>]+>', '', str(question_text))
+        story.append(Paragraph(f"<b>Question:</b> {clean_q}", body_style))
+        story.append(Spacer(1, 10))
+        
+    story.append(Paragraph("<b>Step-by-Step Reasoning:</b>", subtitle_style))
+    story.append(Spacer(1, 8))
+    
+    if steps:
+        for i, step in enumerate(steps, 1):
+            if isinstance(step, (tuple, list)) and len(step) >= 2:
+                title, body = step[0], step[1]
+            else:
+                title, body = f'Step {i}', str(step)
+            clean_title = re.sub(r'<[^>]+>', '', str(title))
+            clean_body = re.sub(r'<[^>]+>', '', str(body)).replace('\n', '<br/>')
+            story.append(Paragraph(f"<b>Step {i}: {clean_title}</b>", body_style))
+            story.append(Paragraph(f"{clean_body}", body_style))
+            story.append(Spacer(1, 6))
+            
+    clean_ans = re.sub(r'<[^>]+>', '', str(answer))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(f"<b>Final Answer: {clean_ans}</b>", subtitle_style))
+    
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+
 def render_answer_card(answer: str, latex_ans: str = None, question_text: str = "", topic_name: str = "", steps: list = None):
     display_ans = clean_math_string(answer)
     st.markdown(f"""
@@ -1201,6 +1236,38 @@ def render_answer_card(answer: str, latex_ans: str = None, question_text: str = 
         full_text = format_full_solution_text(question_text, topic_name, steps, answer)
         with st.expander("📋 Copy Full Step-by-Step Solution", expanded=True):
             st.code(full_text, language=None)
+
+        st.markdown("<div style='margin-top:14px;'></div>", unsafe_allow_html=True)
+        st.markdown("**💾 Export & Download Solution**")
+        c_doc, c_pdf = st.columns(2)
+        with c_doc:
+            if DOCX_AVAILABLE:
+                docx_buf = build_docx(question_text, topic_name, steps, answer)
+                if docx_buf:
+                    st.download_button(
+                        label="📄 Word (.docx)",
+                        data=docx_buf,
+                        file_name="MathMate_solution.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True
+                    )
+            else:
+                st.caption("Install python-docx for Word exports")
+
+        with c_pdf:
+            if REPORTLAB_AVAILABLE:
+                pdf_buf = build_pdf(question_text, topic_name, steps, answer)
+                if pdf_buf:
+                    st.download_button(
+                        label="📥 PDF (.pdf)",
+                        data=pdf_buf,
+                        file_name="MathMate_solution.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+            else:
+                st.caption("Install reportlab for PDF exports")
+
 
 
 
@@ -1230,7 +1297,6 @@ NAV_PAGES = [
     "🏠 Home",
     "🔢 Integers & Divisibility",
     "🧮 Computation of GCD using Euclid’s Algorithm",
-    "⚖️ Solutions of Linear Congruences",
     "📍 Complex Numbers & Polar Form",
     "🔀 Permutations of Distinct Objects",
     "🎲 Combinations of Distinct Objects",
@@ -1275,14 +1341,13 @@ if page == "🏠 Home":
     """, unsafe_allow_html=True)
 
     home_q_input = st.text_area("Question Input", key="home_question_input",
-                                placeholder="e.g. Find GCD of 1071 and 462 using Euclid's algorithm  OR  Solve 14x = 12 mod 18",
+                                placeholder="e.g. Find GCD of 1071 and 462 using Euclid's algorithm  OR  Convert z = 1 + 1.732i to polar form",
                                 height=85, label_visibility="collapsed")
 
     st.caption("Quick sample questions:")
     sample_qs = {
         "divisibility": "Prime factorization and divisors of 360",
         "gcd": "Find GCD of 1071 and 462 using Euclid's algorithm",
-        "congruence": "Solve linear congruence 14x ≡ 12 (mod 18)",
         "complex": "Convert z = 1 + 1.73205i to polar form",
         "perm": "Permutations P(7, 3) of 7 distinct objects",
         "comb": "Choose 4 members from a group of 9 available employees",
@@ -1290,11 +1355,10 @@ if page == "🏠 Home":
         "inverse_image": "Find inverse image f⁻¹({a, c}) for f: {1,2,3,4} -> {a,b,c}"
     }
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
     c1.button("💡 GCD: 1071 & 462", on_click=set_nav_page, args=("🧮 Computation of GCD using Euclid’s Algorithm", sample_qs["gcd"]))
-    c2.button("💡 Congruence: 14x ≡ 12 (mod 18)", on_click=set_nav_page, args=("⚖️ Solutions of Linear Congruences", sample_qs["congruence"]))
-    c3.button("💡 Choose 4 from 9", on_click=set_nav_page, args=("🎲 Combinations of Distinct Objects", sample_qs["comb"]))
-    c4.button("💡 Divisors of 360", on_click=set_nav_page, args=("🔢 Integers & Divisibility", sample_qs["divisibility"]))
+    c2.button("💡 Choose 4 from 9", on_click=set_nav_page, args=("🎲 Combinations of Distinct Objects", sample_qs["comb"]))
+    c3.button("💡 Divisors of 360", on_click=set_nav_page, args=("🔢 Integers & Divisibility", sample_qs["divisibility"]))
 
     def handle_home_solve():
         q = st.session_state.get("home_question_input", "").strip()
@@ -1310,17 +1374,16 @@ if page == "🏠 Home":
 
     st.markdown("---")
     st.markdown("### 📚 UNIT I: Integers, Real Numbers & Complex Numbers")
-    u1_cols = st.columns(4)
+    u1_cols = st.columns(3)
 
     unit1_topics = [
         ("divisibility", "🔢 Integers & Divisibility", "Prime factorization, primality testing, complete divisor lists, τ(n) & σ(n)."),
         ("gcd", "🧮 Computation of GCD (Euclid)", "Computation of GCD using Euclidean division and Extended Euclidean Bézout identity."),
-        ("congruence", "⚖️ Linear Congruences", "Solutions to ax ≡ b (mod m), solvability check gcd(a,m)|b, and incongruent roots."),
         ("complex", "📍 Complex Numbers & Polar Form", "Rectangular to polar conversion, modulus r, argument θ, and Argand plane.")
     ]
 
     for i, (key, title, desc) in enumerate(unit1_topics):
-        with u1_cols[i % 4]:
+        with u1_cols[i % 3]:
             st.markdown(f"""
             <div class="glass-card" style="min-height: 150px;">
                 <div style="font-weight:800; font-size:1.05rem; color:#2EC4B6; margin-bottom:8px;">{title}</div>
@@ -1401,16 +1464,6 @@ elif page in TOPIC_NAV_MAP.values():
         if st.button("Solve step-by-step", type="primary") or auto_trigger:
             steps, answer, extra = solve_gcd_euclidean(a_val, b_val)
 
-    elif topic_key == "congruence":
-        c1, c2, c3 = st.columns(3)
-        default_a = parsed_params.get("a", 14) if topic_key == detected_topic else 14
-        default_b = parsed_params.get("b", 12) if topic_key == detected_topic else 12
-        default_m = parsed_params.get("m", 18) if topic_key == detected_topic else 18
-        a_val = c1.number_input("a (coefficient)", value=int(default_a), step=1)
-        b_val = c2.number_input("b (target remainder)", value=int(default_b), step=1)
-        m_val = c3.number_input("m (modulus)", value=int(default_m), step=1, min_value=1)
-        if st.button("Solve step-by-step", type="primary") or auto_trigger:
-            steps, answer, extra = solve_linear_congruence(a_val, b_val, m_val)
 
     elif topic_key == "complex":
         c1, c2 = st.columns(2)
