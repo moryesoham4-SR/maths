@@ -242,3 +242,10 @@ def save_user_stats(streak: int, xp: int, quiz_correct: int, quiz_total: int):
         conn.close()
     except Exception as e:
         print(f"SQLite save_user_stats error: {e}")
+
+
+def fetch_user_stats():
+    """Wrapper returning tuple (streak, xp, quiz_correct, quiz_total)."""
+    s = load_user_stats()
+    return s.get("streak", 0), s.get("xp", 0), s.get("quiz_correct", 0), s.get("quiz_total", 0)
+
