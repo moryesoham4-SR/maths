@@ -63,7 +63,10 @@ except Exception:
         def save_user_stats(*args, **kwargs): pass
         @staticmethod
         def fetch_user_stats(): return 0, 0, 0, 0
+        @staticmethod
+        def load_user_stats(): return {"streak": 0, "xp": 0, "quiz_correct": 0, "quiz_total": 0}
     db = DummyDB
+
 
 
 # Pure Mathematical Solver Engine (No AI/LLM Dependencies)
@@ -307,11 +310,19 @@ st.markdown(f"""
 db.init_db()
 
 if "streak" not in st.session_state or "xp" not in st.session_state:
-    st_streak, st_xp, st_quiz_corr, st_quiz_tot = db.fetch_user_stats()
+    if hasattr(db, "fetch_user_stats"):
+        st_streak, st_xp, st_quiz_corr, st_quiz_tot = db.fetch_user_stats()
+    elif hasattr(db, "load_user_stats"):
+        s = db.load_user_stats()
+        st_streak, st_xp, st_quiz_corr, st_quiz_tot = s.get("streak", 0), s.get("xp", 0), s.get("quiz_correct", 0), s.get("quiz_total", 0)
+    else:
+        st_streak, st_xp, st_quiz_corr, st_quiz_tot = 0, 0, 0, 0
+
     st.session_state.streak = max(st_streak, 1)
     st.session_state.xp = st_xp
     st.session_state.quiz_score = {"correct": st_quiz_corr, "total": st_quiz_tot}
     st.session_state.stats_loaded = True
+
 
 
 # ============================================================
