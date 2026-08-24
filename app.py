@@ -47,8 +47,9 @@ import plotly.graph_objects as go
 import sympy as sp
 from sympy import factorint, gcdex, mod_inverse
 
-import database as db
-if not hasattr(db, "init_db"):
+try:
+    import db
+except Exception:
     class DummyDB:
         @staticmethod
         def init_db(): pass
@@ -63,6 +64,7 @@ if not hasattr(db, "init_db"):
         @staticmethod
         def fetch_user_stats(): return 0, 0, 0, 0
     db = DummyDB
+
 
 # Pure Mathematical Solver Engine (No AI/LLM Dependencies)
 
