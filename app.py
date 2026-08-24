@@ -1137,10 +1137,13 @@ def build_docx(question_text: str, topic_name: str, steps: list, answer: str) ->
     doc = Document()
     doc.add_heading('MathMate — Interactive Mathematics Lab', level=0)
     doc.add_heading(f'Topic: {topic_name}', level=2)
-    if question_text:
-        doc.add_paragraph(f'Question: {question_text}')
     
-    doc.add_heading('Step-by-Step Reasoning:', level=2)
+    display_q = re.sub(r'<[^>]+>', '', str(question_text)).strip() if question_text else f"{topic_name} Practical Question"
+    p_q = doc.add_paragraph()
+    p_q.add_run("❓ QUESTION STATEMENT:\n").bold = True
+    p_q.add_run(f"{display_q}\n")
+    
+    doc.add_heading('📚 Step-by-Step Reasoning:', level=2)
     if steps:
         for i, step in enumerate(steps, 1):
             if isinstance(step, (tuple, list)) and len(step) >= 2:
@@ -1153,7 +1156,7 @@ def build_docx(question_text: str, topic_name: str, steps: list, answer: str) ->
             p.add_run(f'Step {i}: {clean_title}\n').bold = True
             p.add_run(f'{clean_body.strip()}\n')
             
-    doc.add_heading('Final Answer:', level=2)
+    doc.add_heading('✅ Final Answer:', level=2)
     clean_ans = re.sub(r'<[^>]+>', '', str(answer))
     p_ans = doc.add_paragraph()
     p_ans.add_run(f'{clean_ans.strip()}').bold = True
@@ -1181,10 +1184,9 @@ def build_pdf(question_text: str, topic_name: str, steps: list, answer: str) -> 
     story.append(Paragraph(f"<b>Topic:</b> {topic_name}", subtitle_style))
     story.append(Spacer(1, 10))
     
-    if question_text:
-        clean_q = re.sub(r'<[^>]+>', '', str(question_text))
-        story.append(Paragraph(f"<b>Question:</b> {clean_q}", body_style))
-        story.append(Spacer(1, 10))
+    display_q = re.sub(r'<[^>]+>', '', str(question_text)).strip() if question_text else f"{topic_name} Practical Question"
+    story.append(Paragraph(f"<b>Question Statement:</b><br/>{display_q}", body_style))
+    story.append(Spacer(1, 12))
         
     story.append(Paragraph("<b>Step-by-Step Reasoning:</b>", subtitle_style))
     story.append(Spacer(1, 8))
@@ -1227,16 +1229,16 @@ def render_answer_card(answer: str, latex_ans: str = None, question_text: str = 
             st.code(full_text, language=None)
 
         st.markdown("<div style='margin-top:14px;'></div>", unsafe_allow_html=True)
-        st.markdown("**💾 Export & Download Solution**")
+        st.markdown("**💾 Download Question & Solution**")
         c_doc, c_pdf = st.columns(2)
         with c_doc:
             if DOCX_AVAILABLE:
                 docx_buf = build_docx(question_text, topic_name, steps, answer)
                 if docx_buf:
                     st.download_button(
-                        label="📄 Word (.docx)",
+                        label="📄 Download Word (.docx)",
                         data=docx_buf,
-                        file_name="MathMate_solution.docx",
+                        file_name="MathMate_question_and_solution.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         use_container_width=True
                     )
@@ -1248,14 +1250,15 @@ def render_answer_card(answer: str, latex_ans: str = None, question_text: str = 
                 pdf_buf = build_pdf(question_text, topic_name, steps, answer)
                 if pdf_buf:
                     st.download_button(
-                        label="📥 PDF (.pdf)",
+                        label="📥 Download PDF (.pdf)",
                         data=pdf_buf,
-                        file_name="MathMate_solution.pdf",
+                        file_name="MathMate_question_and_solution.pdf",
                         mime="application/pdf",
                         use_container_width=True
                     )
             else:
                 st.caption("Install reportlab for PDF exports")
+
 
 
 
