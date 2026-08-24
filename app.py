@@ -370,13 +370,6 @@ TOPIC_CONCEPTS = {
             "Bézout's Identity: Extended Euclidean algorithm finds integers x, y satisfying ax + by = gcd(a,b)."
         ]
     },
-        "identity": r"d = \gcd(a, m) \mid b \iff \text{Solvable with } d \text{ solutions modulo } m",
-        "key_points": [
-            "Solvability Condition: d = gcd(a, m) must divide b.",
-            "If d | b, reduce to (a/d)x ≡ (b/d) mod (m/d).",
-            "Solutions mod m: x_k = (x_0 + k · (m/d)) mod m for k = 0, 1, ..., d-1."
-        ]
-    },
     "complex": {
         "title": "Complex Numbers & Polar Form",
         "desc": "Complex numbers z = a + bi can be represented in polar coordinates (r, θ) on the Argand plane.",
@@ -1000,25 +993,7 @@ def generate_procedural_question(topic_key: str = None):
             "exp": f"Euclidean division breakdown yields last non-zero remainder gcd({a}, {b}) = {correct}."
         }
 
-    elif topic_key == "congruence":
-        m = random.choice([7, 9, 11, 13])
-        a = random.randint(2, m-1)
-        x_true = random.randint(1, m-1)
-        b = (a * x_true) % m
-        steps, ans, extra = solve_linear_congruence(a, b, m)
-        correct = str(x_true)
-        opts = {correct, str((x_true + 2) % m), str((x_true + 4) % m), str((x_true + 5) % m)}
-        while len(opts) < 4:
-            opts.add(str(random.randint(0, m-1)))
-        opts = list(opts)
-        random.shuffle(opts)
-        return {
-            "q": f"Solve the linear congruence: {a}x ≡ {b} (mod {m}). Find x (mod {m}).",
-            "topic": "congruence",
-            "options": opts,
-            "answer": correct,
-            "exp": f"Since gcd({a}, {m}) = 1, x ≡ ({a}⁻¹ × {b}) mod {m} = {x_true}."
-        }
+
 
     elif topic_key == "complex":
         a = random.choice([-4, -3, -2, -1, 1, 2, 3, 4])
