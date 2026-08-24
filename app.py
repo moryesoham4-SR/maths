@@ -531,10 +531,6 @@ def parse_question(text: str):
         return topic, {"n": abs(n), "r": abs(r)}
     return topic, {}
 
-        n = max(nums[0], nums[1]) if len(nums) >= 2 else nums[0] if len(nums) == 1 else 7
-        r = min(nums[0], nums[1]) if len(nums) >= 2 else 3
-        return topic, {"n": abs(n), "r": abs(r)}
-    return topic, {}
 
 
 # ============================================================
