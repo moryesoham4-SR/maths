@@ -921,204 +921,7 @@ def render_euclidean_html_table(rows: list):
     st.markdown(table_html, unsafe_allow_html=True)
 
 
-def plot_divisors_plotly(n: int, divisors: list):
-    """Visual bar graph of all divisors of integer n with factor pairs."""
-    fig = go.Figure()
-    pairs = [f"{d} × {n//d}" for d in divisors]
 
-    fig.add_trace(go.Bar(
-        x=[str(d) for d in divisors],
-        y=divisors,
-        marker=dict(color=divisors, colorscale='Viridis'),
-        hovertext=[f"Divisor: {d}<br>Complement: {n//d}<br>Pair: {p}" for d, p in zip(divisors, pairs)],
-        hovertemplate="<b>%{hovertext}</b><extra></extra>"
-    ))
-
-    fig.update_layout(
-        title=f"<b>Positive Divisors Breakdown for n = {n} (Total τ({n}) = {len(divisors)})</b>",
-        xaxis=dict(title="Divisors d", gridcolor="rgba(255,255,255,0.05)"),
-        yaxis=dict(title="Divisor Value", gridcolor="rgba(255,255,255,0.05)"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(10,18,38,0.6)",
-        font=dict(color="#FFFFFF", family="Outfit"),
-        margin=dict(l=20, r=20, t=40, b=20),
-        height=380
-    )
-    return fig
-
-
-def plot_congruence_clock_plotly(m: int, solutions: list):
-    """Modular clock / circle visualization for linear congruences ax ≡ b (mod m)."""
-    fig = go.Figure()
-    angles = np.linspace(0, 2*np.pi, m, endpoint=False)
-    angles = (np.pi/2 - angles) % (2*np.pi)
-    r = 1.0
-
-    x_nodes = r * np.cos(angles)
-    y_nodes = r * np.sin(angles)
-    sol_set = set(solutions)
-
-    t_smooth = np.linspace(0, 2*np.pi, 200)
-    fig.add_trace(go.Scatter(
-        x=r*np.cos(t_smooth), y=r*np.sin(t_smooth),
-        mode='lines', line=dict(color='rgba(255, 255, 255, 0.2)', dash='dash'),
-        hoverinfo='skip', showlegend=False
-    ))
-
-    non_sol_idx = [i for i in range(m) if i not in sol_set]
-    if non_sol_idx:
-        fig.add_trace(go.Scatter(
-            x=[x_nodes[i] for i in non_sol_idx],
-            y=[y_nodes[i] for i in non_sol_idx],
-            mode='markers+text',
-            marker=dict(size=22, color='rgba(74, 78, 105, 0.6)', line=dict(width=1, color='#FFFFFF')),
-            text=[str(i) for i in non_sol_idx],
-            textposition="middle center",
-            textfont=dict(color="#FFFFFF", size=10),
-            name="Non-solution mod m"
-        ))
-
-    sol_idx = [i for i in range(m) if i in sol_set]
-    if sol_idx:
-        fig.add_trace(go.Scatter(
-            x=[x_nodes[i] for i in sol_idx],
-            y=[y_nodes[i] for i in sol_idx],
-            mode='markers+text',
-            marker=dict(size=30, color=TEAL, line=dict(width=3, color=AMBER)),
-            text=[str(i) for i in sol_idx],
-            textposition="middle center",
-            textfont=dict(color="#000000", size=12, weight="bold"),
-            name="Solution mod m"
-        ))
-
-    fig.update_layout(
-        title=f"<b>Modular Clock Solution Graph (mod {m})</b>",
-        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.4, 1.4]),
-        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False, range=[-1.4, 1.4], scaleanchor="x", scaleratio=1),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(10,18,38,0.6)",
-        font=dict(color="#FFFFFF", family="Outfit"),
-        margin=dict(l=20, r=20, t=40, b=20),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        height=380
-    )
-    return fig
-
-
-def plot_complex_plane_plotly(points: list, labels: list, colors: list = None):
-    fig = go.Figure()
-    max_r = max([math.hypot(x, y) for x, y in points] + [2.0]) * 1.25
-
-    t_vals = np.linspace(0, 2*np.pi, 200)
-    fig.add_trace(go.Scatter(
-        x=max_r * 0.8 * np.cos(t_vals), y=max_r * 0.8 * np.sin(t_vals),
-        mode='lines', line=dict(color='rgba(255, 255, 255, 0.15)', dash='dash'),
-        hoverinfo='skip', showlegend=False
-    ))
-
-    fig.add_shape(type="line", x0=-max_r, y0=0, x1=max_r, y1=0, line=dict(color="rgba(255,255,255,0.3)", width=1.5))
-    fig.add_shape(type="line", x0=0, y0=-max_r, x1=0, y1=max_r, line=dict(color="rgba(255,255,255,0.3)", width=1.5))
-
-    for i, (re_, im_) in enumerate(points):
-        lbl = labels[i] if i < len(labels) else f"z{i}"
-        col = colors[i] if colors and i < len(colors) else AMBER
-        r_val = math.hypot(re_, im_)
-        ang_deg = math.degrees(math.atan2(im_, re_))
-
-        fig.add_trace(go.Scatter(
-            x=[0, re_], y=[0, im_],
-            mode='lines', line=dict(color=col, width=2.5),
-            hoverinfo='skip', showlegend=False
-        ))
-
-        fig.add_trace(go.Scatter(
-            x=[re_], y=[im_],
-            mode='markers+text',
-            marker=dict(size=12, color=col, line=dict(width=2, color='#FFFFFF')),
-            text=[f"  {lbl}"], textposition="top right",
-            hovertemplate=f"<b>{lbl}</b><br>Real: {re_:.4f}<br>Imag: {im_:.4f}i<br>Modulus r: {r_val:.4f}<br>Angle θ: {ang_deg:.2f}°<extra></extra>",
-            name=lbl
-        ))
-
-    fig.update_layout(
-        xaxis=dict(title="Real Axis (Re)", range=[-max_r, max_r], zeroline=False, gridcolor="rgba(255,255,255,0.05)"),
-        yaxis=dict(title="Imaginary Axis (Im)", range=[-max_r, max_r], zeroline=False, scaleanchor="x", scaleratio=1, gridcolor="rgba(255,255,255,0.05)"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(10,18,38,0.6)",
-        font=dict(color="#FFFFFF", family="Outfit"),
-        margin=dict(l=20, r=20, t=30, b=20),
-        showlegend=False,
-        height=420
-    )
-    return fig
-
-
-def plot_perm_comb_plotly(n: int, r: int, val_npr: int, val_ncr: int):
-    """Bar chart comparing arrangement types: n!, P(n,r), C(n,r), (n-1)!."""
-    val_fact = math.factorial(n)
-    val_circ = math.factorial(n - 1) if n >= 1 else 0
-
-    categories = [f"Full Row n! ({n}!)", f"Permutations P({n},{r})", f"Combinations C({n},{r})", f"Circular ({n}-1)!"]
-    values = [val_fact, val_npr, val_ncr, val_circ]
-    colors = [CORAL, TEAL, AMBER, GRAPHITE]
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=categories, y=values,
-        marker_color=colors,
-        text=[str(v) for v in values],
-        textposition="auto"
-    ))
-
-    fig.update_layout(
-        title=f"<b>Counting Analysis Comparison (n = {n}, r = {r})</b>",
-        xaxis=dict(gridcolor="rgba(255,255,255,0.05)"),
-        yaxis=dict(title="Count / Possibilities", type="log" if max(values) > 1000 else "linear", gridcolor="rgba(255,255,255,0.05)"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(10,18,38,0.6)",
-        font=dict(color="#FFFFFF", family="Outfit"),
-        margin=dict(l=20, r=20, t=40, b=20),
-        height=380
-    )
-    return fig
-
-
-def plot_pascals_triangle_plotly(n: int, r: int):
-    """Interactive Pascal's Triangle heatmap highlighting position C(n, r)."""
-    max_row = max(n + 1, 6)
-    matrix = np.zeros((max_row, max_row))
-
-    for i in range(max_row):
-        for j in range(i + 1):
-            matrix[i, j] = math.comb(i, j)
-
-    fig = go.Figure()
-    fig.add_trace(go.Heatmap(
-        z=matrix,
-        colorscale='Viridis',
-        showscale=False,
-        hoverongaps=False
-    ))
-
-    fig.add_trace(go.Scatter(
-        x=[r], y=[n],
-        mode='markers+text',
-        marker=dict(size=24, color=AMBER, line=dict(width=3, color='#FFFFFF')),
-        text=[f"C({n},{r})={math.comb(n,r)}"], textposition="top center",
-        textfont=dict(color="#FFFFFF", weight="bold")
-    ))
-
-    fig.update_layout(
-        title=f"<b>Pascal's Triangle Binomial Grid — Highlighting C({n}, {r}) = {math.comb(n,r)}</b>",
-        xaxis=dict(title="Column r", dtick=1, gridcolor="rgba(255,255,255,0.05)"),
-        yaxis=dict(title="Row n", dtick=1, autorange="reversed", gridcolor="rgba(255,255,255,0.05)"),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(10,18,38,0.6)",
-        font=dict(color="#FFFFFF", family="Outfit"),
-        margin=dict(l=20, r=20, t=40, b=20),
-        height=380
-    )
-    return fig
 
 
 def plot_function_diagram_plotly(domain: list, codomain: list, mapping: dict, highlight_target_set: list = None):
@@ -1700,31 +1503,16 @@ elif page in TOPIC_NAV_MAP.values():
             if topic_key == "gcd":
                 st.markdown("### 📊 Extended Euclidean Table (Textbook Method)")
                 render_euclidean_html_table(extra["table_rows"])
-            else:
-                st.markdown("### 📐 Interactive Mathematics Visualization")
-                if topic_key == "divisibility":
-                    fig = plot_divisors_plotly(extra["n"], extra["divisors"])
-                    st.plotly_chart(fig, use_container_width=True)
-                elif topic_key == "congruence" and extra.get("solvable"):
-                    fig = plot_congruence_clock_plotly(extra["m"], extra["solutions"])
-                    st.plotly_chart(fig, use_container_width=True)
-                elif topic_key == "complex":
-                    fig = plot_complex_plane_plotly([(extra["a"], extra["b"])], ["z"])
-                    st.plotly_chart(fig, use_container_width=True)
-                elif topic_key == "perm":
-                    fig = plot_perm_comb_plotly(extra["n"], extra["r"], extra["val"], math.comb(extra["n"], extra["r"]))
-                    st.plotly_chart(fig, use_container_width=True)
-                elif topic_key == "comb":
-                    fig = plot_pascals_triangle_plotly(extra["n"], extra["r"])
-                    st.plotly_chart(fig, use_container_width=True)
-                elif topic_key in ["functions", "inverse_image"]:
-                    fig = plot_function_diagram_plotly(
-                        [x.strip() for x in domain_str.split(",") if x.strip()],
-                        [x.strip() for x in codomain_str.split(",") if x.strip()],
-                        mapping,
-                        highlight_target_set=extra.get("target_set", [])
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+            elif topic_key in ["functions", "inverse_image"]:
+                st.markdown("### 📐 Function Mapping Diagram")
+                fig = plot_function_diagram_plotly(
+                    [x.strip() for x in domain_str.split(",") if x.strip()],
+                    [x.strip() for x in codomain_str.split(",") if x.strip()],
+                    mapping,
+                    highlight_target_set=extra.get("target_set", [])
+                )
+                st.plotly_chart(fig, use_container_width=True)
+
 
         with info_col:
             render_answer_card(answer, latex_ans=extra.get("latex_ans"), question_text=question_text, topic_name=TOPICS.get(topic_key, topic_key), steps=steps)
