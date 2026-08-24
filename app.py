@@ -887,38 +887,41 @@ def solve_inverse_image(domain: list, codomain: list, mapping: dict, target_set:
 
 def render_euclidean_html_table(rows: list):
     """Textbook Extended Euclidean Table UI Renderer."""
-    table_html = """
-    <div style="overflow-x:auto; margin-top:10px;">
-    <table style="width:100%; border-collapse:collapse; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:12px; font-size:0.92rem; text-align:center;">
-        <thead>
-            <tr style="background:rgba(46, 196, 182, 0.15); color:#2EC4B6; border-bottom:1px solid rgba(46,196,182,0.3); font-weight:700;">
-                <th style="padding:10px;">Step (i)</th>
-                <th style="padding:10px;">Dividend (a)</th>
-                <th style="padding:10px;">Divisor (b)</th>
-                <th style="padding:10px;">Quotient (q)</th>
-                <th style="padding:10px;">Remainder (r)</th>
-                <th style="padding:10px;">x</th>
-                <th style="padding:10px;">y</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
+    html_lines = [
+        '<div style="overflow-x:auto; margin-top:10px;">',
+        '<table style="width:100%; border-collapse:collapse; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); border-radius:12px; font-size:0.92rem; text-align:center;">',
+        '<thead>',
+        '<tr style="background:rgba(46, 196, 182, 0.2); color:#2EC4B6; border-bottom:1px solid rgba(46,196,182,0.3); font-weight:700;">',
+        '<th style="padding:10px;">Step (i)</th>',
+        '<th style="padding:10px;">Dividend (a)</th>',
+        '<th style="padding:10px;">Divisor (b)</th>',
+        '<th style="padding:10px;">Quotient (q)</th>',
+        '<th style="padding:10px;">Remainder (r)</th>',
+        '<th style="padding:10px;">x</th>',
+        '<th style="padding:10px;">y</th>',
+        '</tr>',
+        '</thead>',
+        '<tbody>'
+    ]
     for r in rows:
         is_gcd = r.get("is_gcd", False)
-        bg = "background:rgba(46,196,182,0.25); color:#FFFFFF; font-weight:800;" if is_gcd else ""
-        table_html += f"""
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.05); {bg}">
-                <td style="padding:8px;">{r['Step (i)']}</td>
-                <td style="padding:8px;">{r['Dividend']}</td>
-                <td style="padding:8px;">{r['Divisor']}</td>
-                <td style="padding:8px;">{r['Quotient (q)']}</td>
-                <td style="padding:8px; color:{TEAL if is_gcd else '#FFFFFF'};">{r['Remainder (r)']} {'⭐ (GCD)' if is_gcd else ''}</td>
-                <td style="padding:8px;">{r['x']}</td>
-                <td style="padding:8px;">{r['y']}</td>
-            </tr>
-        """
-    table_html += "</tbody></table></div>"
+        bg = "background:rgba(46,196,182,0.3); color:#FFFFFF; font-weight:800;" if is_gcd else ""
+        gcd_mark = " ⭐ (GCD)" if is_gcd else ""
+        html_lines.append(
+            f'<tr style="border-bottom:1px solid rgba(255,255,255,0.05); {bg}">'
+            f'<td style="padding:8px;">{r["Step (i)"]}</td>'
+            f'<td style="padding:8px;">{r["Dividend"]}</td>'
+            f'<td style="padding:8px;">{r["Divisor"]}</td>'
+            f'<td style="padding:8px;">{r["Quotient (q)"]}</td>'
+            f'<td style="padding:8px; color:{TEAL if is_gcd else "#FFFFFF"};">{r["Remainder (r)"]}{gcd_mark}</td>'
+            f'<td style="padding:8px;">{r["x"]}</td>'
+            f'<td style="padding:8px;">{r["y"]}</td>'
+            f'</tr>'
+        )
+    html_lines.append('</tbody></table></div>')
+    table_html = "".join(html_lines)
     st.markdown(table_html, unsafe_allow_html=True)
+
 
 
 
