@@ -1002,7 +1002,29 @@ def render_understand_panel(topic_key):
         st.markdown(f"• {pt}")
 
 
-def render_answer_card(answer):
+def format_full_solution_text(question_text: str, topic_name: str, steps: list, answer: str) -> str:
+    lines = []
+    lines.append(f"📌 TOPIC: {topic_name}")
+    if question_text:
+        lines.append(f"❓ QUESTION: {question_text}")
+    lines.append("\n📚 STEP-BY-STEP SOLUTION:")
+    if steps:
+        for i, step in enumerate(steps, 1):
+            if isinstance(step, (tuple, list)) and len(step) >= 2:
+                title, body = step[0], step[1]
+            else:
+                title, body = f"Step {i}", str(step)
+            clean_title = re.sub(r'<[^>]+>', '', str(title))
+            clean_body = re.sub(r'<[^>]+>', '', str(body))
+            lines.append(f"\n  Step {i}: {clean_title}")
+            lines.append(f"    {clean_body.strip()}")
+    
+    clean_ans = re.sub(r'<[^>]+>', '', str(answer))
+    lines.append(f"\n✅ FINAL ANSWER: {clean_ans.strip()}")
+    return "\n".join(lines)
+
+
+def render_answer_card(answer, question_text="", topic_name="", steps=None):
     st.markdown(f"""
     <div class="answer-card">
         <div class="answer-badge">FINAL ANSWER</div>
@@ -1010,8 +1032,11 @@ def render_answer_card(answer):
         <div class="answer-status">✓ Computed & Verified</div>
     </div>
     """, unsafe_allow_html=True)
-    st.markdown("**📋 Quick Copy Answer:**")
-    st.code(answer, language=None)
+    if steps:
+        full_text = format_full_solution_text(question_text, topic_name, steps, answer)
+        with st.expander("📋 Copy Full Step-by-Step Solution", expanded=True):
+            st.code(full_text, language=None)
+
 
 
 
@@ -1333,9 +1358,9 @@ elif page in TOPIC_NAV_MAP.values():
             st.markdown("### 💾 Save & Export Solution")
             e1, e2, e3 = st.columns(3)
             with e1:
-                if st.button("📋 Copy Answer", key="btn_copy_ans_act"):
+                if st.button("📋 Copy Full Solution", key="btn_copy_ans_act"):
                     st.session_state.show_copy_box = True
-                    st.toast(f"📋 Answer ready to copy below!")
+                    st.toast(f"📋 Full step-by-step solution ready to copy below!")
             with e2:
                 if DOCX_AVAILABLE:
                     buf = build_docx(question_text or TOPICS[topic_key], TOPICS[topic_key], steps, answer) if 'build_docx' in globals() else None
@@ -1352,12 +1377,14 @@ elif page in TOPIC_NAV_MAP.values():
                     st.caption("Install `reportlab` for PDF.")
 
             if st.session_state.get("show_copy_box"):
-                st.code(answer, language=None)
+                full_sol_text = format_full_solution_text(question_text or f"{TOPICS.get(topic_key, topic_key)} problem", TOPICS.get(topic_key, topic_key), steps, answer)
+                st.code(full_sol_text, language=None)
 
 
         with info_col:
-            render_answer_card(answer)
+            render_answer_card(answer, question_text=question_text, topic_name=TOPICS.get(topic_key, topic_key), steps=steps)
             render_understand_panel(topic_key)
+
 
             # Persist to database (Supabase / SQLite)
             last_solved_key = f"{question_text}_{topic_key}_{answer}"
