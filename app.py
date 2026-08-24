@@ -49,6 +49,8 @@ from sympy import factorint, gcdex, mod_inverse
 
 try:
     import db
+    if not hasattr(db, "init_db") or not hasattr(db, "save_solution"):
+        raise AttributeError("Imported db is missing required attributes")
 except Exception:
     class DummyDB:
         @staticmethod
@@ -66,6 +68,7 @@ except Exception:
         @staticmethod
         def load_user_stats(): return {"streak": 0, "xp": 0, "quiz_correct": 0, "quiz_total": 0}
     db = DummyDB
+
 
 
 
@@ -304,10 +307,12 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
-# ============================================================
-# STATE INITIALIZATION
-# ============================================================
-db.init_db()
+if hasattr(db, "init_db"):
+    try:
+        db.init_db()
+    except Exception:
+        pass
+
 
 if "streak" not in st.session_state or "xp" not in st.session_state:
     if hasattr(db, "fetch_user_stats"):
