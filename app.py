@@ -1446,6 +1446,9 @@ elif page in TOPIC_NAV_MAP.values():
         n_val = st.number_input("Integer n", value=int(default_n), step=1, min_value=2)
         if st.button("Solve step-by-step", type="primary") or auto_trigger:
             steps, answer, extra = solve_divisibility(n_val)
+            if not question_text:
+                question_text = f"Find the prime factorization, complete set of positive divisors, τ({n_val}), and sum of divisors σ({n_val}) for integer n = {n_val}."
+
 
     elif topic_key == "gcd":
         c1, c2 = st.columns(2)
@@ -1455,7 +1458,8 @@ elif page in TOPIC_NAV_MAP.values():
         b_val = c2.number_input("Integer b", value=int(default_b), step=1)
         if st.button("Solve step-by-step", type="primary") or auto_trigger:
             steps, answer, extra = solve_gcd_euclidean(a_val, b_val)
-
+            if not question_text:
+                question_text = f"Compute gcd({a_val}, {b_val}) strictly using Euclid's division algorithm and Extended Euclidean Bézout identity."
 
     elif topic_key == "complex":
         c1, c2 = st.columns(2)
@@ -1465,6 +1469,8 @@ elif page in TOPIC_NAV_MAP.values():
         b_val = c2.number_input("Imaginary part (b)", value=float(default_b))
         if st.button("Solve step-by-step", type="primary") or auto_trigger:
             steps, answer, extra = solve_complex_to_polar(a_val, b_val)
+            if not question_text:
+                question_text = f"Convert z = {a_val} + {b_val}i to polar form r(cos θ + i sin θ) and calculate modulus r and argument θ."
 
     elif topic_key == "perm":
         c1, c2 = st.columns(2)
@@ -1474,6 +1480,8 @@ elif page in TOPIC_NAV_MAP.values():
         r_val = c2.number_input("r (arranged objects)", value=int(default_r), step=1, min_value=0)
         if st.button("Solve step-by-step", type="primary") or auto_trigger:
             steps, answer, extra = solve_perm(int(n_val), int(r_val))
+            if not question_text:
+                question_text = f"Find the number of permutations P({int(n_val)}, {int(r_val)}) for arranging {int(r_val)} objects from {int(n_val)} distinct objects."
 
     elif topic_key == "comb":
         c1, c2 = st.columns(2)
@@ -1483,6 +1491,8 @@ elif page in TOPIC_NAV_MAP.values():
         r_val = c2.number_input("r (chosen items)", value=int(default_r), step=1, min_value=0)
         if st.button("Solve step-by-step", type="primary") or auto_trigger:
             steps, answer, extra = solve_comb(int(n_val), int(r_val))
+            if not question_text:
+                question_text = f"Find the number of combinations C({int(n_val)}, {int(r_val)}) for choosing {int(r_val)} items from {int(n_val)} distinct items."
 
     elif topic_key == "functions":
         c1, c2 = st.columns(2)
@@ -1497,6 +1507,9 @@ elif page in TOPIC_NAV_MAP.values():
                 mapping[d] = st.selectbox(f"f({d}) =", codomain, key=f"fn_map_{d}")
         if st.button("Classify Function", type="primary") or (auto_trigger and len(domain) > 0):
             steps, answer, extra = solve_functions(domain, codomain, mapping)
+            if not question_text:
+                map_str = ", ".join(f"f({k})={v}" for k, v in mapping.items())
+                question_text = f"Given f: {{{', '.join(domain)}}} → {{{', '.join(codomain)}}} with mapping {map_str}, classify if f is Injective, Surjective, or Bijective."
 
     elif topic_key == "inverse_image":
         c1, c2, c3 = st.columns(3)
@@ -1513,6 +1526,9 @@ elif page in TOPIC_NAV_MAP.values():
                 mapping[d] = st.selectbox(f"f({d}) =", codomain, key=f"inv_map_{d}")
         if st.button("Find Inverse Image f⁻¹(S)", type="primary") or (auto_trigger and len(domain) > 4):
             steps, answer, extra = solve_inverse_image(domain, codomain, mapping, target_set)
+            if not question_text:
+                map_str = ", ".join(f"f({k})={v}" for k, v in mapping.items())
+                question_text = f"Given f: {{{', '.join(domain)}}} → {{{', '.join(codomain)}}} with mapping {map_str}, find the inverse image f⁻¹({{{', '.join(target_set)}}})."
 
 
 
@@ -1531,12 +1547,14 @@ elif page in TOPIC_NAV_MAP.values():
     elif "active_solution" in st.session_state:
         act = st.session_state.active_solution
         if act.get("topic_key") == topic_key:
+            question_text = act.get("question_text", question_text)
             steps = act.get("steps")
             answer = act.get("answer")
             extra = act.get("extra", {})
             domain_str = act.get("domain_str", domain_str)
             codomain_str = act.get("codomain_str", codomain_str)
             mapping = act.get("mapping", mapping)
+
 
     # Render solution & Visualizations / Tables
     if steps:
