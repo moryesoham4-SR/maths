@@ -357,7 +357,14 @@ TOPIC_NAV_MAP = {
 
 TOPIC_KEYWORDS = {
     "divisibility": ["divisibility", "prime factor", "factorization", "divisors", "prime test", "is prime", "factors of"],
-    "gcd": ["gcd", "hcf", "euclidean", "euclid", "greatest common divisor", "euclid's algorithm", "highest common factor", "bezout"],
+    "gcd": [
+        "gcd", "hcf", "euclidean", "euclid", "greatest common divisor", "euclid's algorithm", "highest common factor", "bezout",
+        "gift pack", "gift packs", "identical pack", "identical packs", "equal group", "equal groups", "items leftover",
+        "plank", "planks", "wooden plank", "cut piece", "cut pieces", "without waste", "greatest possible length", "equal smaller pieces",
+        "courtyard", "rectangular courtyard", "square tile", "square tiles", "paved entirely", "largest possible size", "tiling",
+        "leaving remainder", "leaving remainders", "leaves remainder", "leaves remainders", "remainders of",
+        "greatest number that divides", "largest number that divides", "maximum number of"
+    ],
     "complex": ["polar form", "modulus", "argument", "rectangular form", "complex number", "argand", "imaginary", "real part"],
     "perm": ["permutation", "permutations", "arrange", "arrangement", "order", "sequence", "line", "row", "npr", "circular permutation"],
     "comb": ["combination", "combinations", "choose", "chosen", "select", "selection", "committee", "team", "pool", "ncr", "ways to choose"],
@@ -534,9 +541,11 @@ def parse_question(text: str):
     nums = extract_integers(text)
 
     if topic == "gcd":
+        word_kws = ["pack", "plank", "tile", "remainder", "cut", "waste", "courtyard", "piece", "eraser", "pencil", "pen", "divide", "greatest", "maximum", "leftover"]
+        is_wp = len(nums) > 2 or any(k in text.lower() for k in word_kws)
         a = nums[0] if len(nums) >= 1 else 1071
         b = nums[1] if len(nums) >= 2 else 462
-        return topic, {"a": a, "b": b}
+        return topic, {"a": a, "b": b, "nums": nums, "is_word_problem": is_wp}
     elif topic == "divisibility":
         n = nums[0] if len(nums) >= 1 else 360
         return topic, {"n": abs(n)}
@@ -711,6 +720,209 @@ def solve_gcd_euclidean(a: int, b: int):
         "x_bez": x_bez, "y_bez": y_bez, "table_rows": table_rows,
         "bezout_str": bezout_str, "latex_ans": ans_latex
     }
+
+
+def solve_gcd_multi(nums: list[int]):
+    """Computes GCD for an arbitrary list of 2 or more integers step-by-step using Prime Factorization and Euclidean Division."""
+    nums = [abs(x) for x in nums if x != 0]
+    if not nums:
+        return [("Validation Error", "Please provide non-zero integers.")], "Invalid input", {}
+    if len(nums) == 1:
+        return [("Single Integer", f"gcd({nums[0]}) = {nums[0]}")], f"gcd({nums[0]}) = {nums[0]}", {"gcd": nums[0], "nums": nums}
+
+    steps = []
+    nums_str = ", ".join(map(str, nums))
+    steps.append(("Input Specification", f"Compute gcd({nums_str}) step-by-step."))
+
+    fact_steps = []
+    for num in nums:
+        f_dict = factorint(num)
+        fact_plain = format_prime_factorization_plain(f_dict)
+        fact_steps.append(f"• {num} = {fact_plain}")
+    
+    gcd_val = math.gcd(*nums)
+    fact_gcd = format_prime_factorization_plain(factorint(gcd_val)) if gcd_val > 1 else "1"
+    
+    steps.append(("Prime Factorization Method", 
+                  "Prime factorizations of given numbers:\n" + "\n".join(fact_steps) + 
+                  f"\n\ngcd({nums_str}) = product of lowest powers of common prime factors = {fact_gcd} = {gcd_val}"))
+
+    curr_gcd = nums[0]
+    euclid_chain = []
+    for i in range(1, len(nums)):
+        a, b = curr_gcd, nums[i]
+        u, v = max(a, b), min(a, b)
+        curr_a, curr_b = u, v
+        e_steps = []
+        step_idx = 1
+        while curr_b != 0:
+            q = curr_a // curr_b
+            r = curr_a % curr_b
+            e_steps.append(f"    Step {step_idx}: {curr_a} = {q} × {curr_b} + {r} (q={q}, r={r})")
+            curr_a, curr_b = curr_b, r
+            step_idx += 1
+        next_gcd = curr_a
+        euclid_chain.append(f"• Pair {i}: gcd({curr_gcd}, {nums[i]})\n" + "\n".join(e_steps) + f"\n    ➜ gcd({curr_gcd}, {nums[i]}) = {next_gcd}")
+        curr_gcd = next_gcd
+
+    steps.append(("Euclidean Algorithm (Iterative Pairwise Division)", "\n\n".join(euclid_chain)))
+    steps.append(("Final GCD Result", f"Greatest Common Divisor: gcd({nums_str}) = {gcd_val}"))
+
+    ans_str = f"gcd({nums_str}) = {gcd_val}"
+    ans_latex = fr"\gcd({', '.join(map(str, nums))}) = {gcd_val}"
+
+    return steps, ans_str, {"gcd": gcd_val, "nums": nums, "latex_ans": ans_latex}
+
+
+def solve_gcd_word_problem(text: str):
+    """
+    Parses and solves real-world GCD word problems:
+    1. Equal Groups & Distribution (gift packs, pens, pencils, erasers)
+    2. Cutting Without Waste (planks, ropes, rods)
+    3. Tiling a Surface (rectangular area with square tiles)
+    4. Remainder Pattern (greatest number dividing A, B, C leaving remainders R1, R2, R3)
+    """
+    t = text.lower()
+    nums = extract_integers(text)
+
+    # Check Type 4: Remainder Pattern
+    remainder_match = re.search(r"divides?\s+([\d+,\s\text{and}]+)\s+leaving\s+remainders?\s+of\s+([\d+,\s\text{and}]+)", text, re.IGNORECASE)
+    if remainder_match or ("remainder" in t and len(nums) >= 4):
+        if remainder_match:
+            n_strs = re.findall(r"\b\d+\b", remainder_match.group(1))
+            r_strs = re.findall(r"\b\d+\b", remainder_match.group(2))
+            n_vals = [int(x) for x in n_strs]
+            r_vals = [int(x) for x in r_strs]
+        else:
+            mid = len(nums) // 2
+            n_vals = nums[:mid]
+            r_vals = nums[mid:]
+
+        if len(n_vals) == len(r_vals) and len(n_vals) >= 2:
+            adj_vals = [n - r for n, r in zip(n_vals, r_vals)]
+            steps = []
+            steps.append(("Problem Classification", "Topic: GCD Remainder Pattern Problem.\nGoal: Find the greatest number that divides given numbers leaving specified remainders."))
+            
+            sub_lines = [f"• {n} - {r} = {adj}" for n, r, adj in zip(n_vals, r_vals, adj_vals)]
+            steps.append(("Step 1: Subtract Remainders", "Subtract the respective remainders from each given number:\n" + "\n".join(sub_lines)))
+            
+            gcd_val = math.gcd(*adj_vals)
+            adj_str = ", ".join(map(str, adj_vals))
+            
+            fact_lines = [f"• {adj} = {format_prime_factorization_plain(factorint(adj))}" for adj in adj_vals]
+            steps.append(("Step 2: Compute GCD of Adjusted Numbers", 
+                          f"Find gcd({adj_str}):\n\nPrime Factorization:\n" + "\n".join(fact_lines) +
+                          f"\n\ngcd({adj_str}) = {gcd_val}"))
+
+            ans_str = f"The greatest number is: {gcd_val}"
+            ans_latex = fr"\text{{Greatest Number}} = \gcd({', '.join(map(str, adj_vals))}) = \mathbf{{{gcd_val}}}"
+            steps.append(("Step 3: Final Answer", f"The greatest required number that divides {', '.join(map(str, n_vals))} leaving remainders {', '.join(map(str, r_vals))} is {gcd_val}."))
+
+            return steps, ans_str, {"gcd": gcd_val, "adj_vals": adj_vals, "latex_ans": ans_latex}
+
+    # Check Type 3: Tiling a Surface (Area-Based GCD)
+    if any(k in t for k in ["tile", "tiles", "courtyard", "paved", "square tile", "square tiles", "floor"]):
+        if len(nums) >= 2:
+            length, width = nums[0], nums[1]
+            tile_side = math.gcd(length, width)
+            total_area = length * width
+            tile_area = tile_side * tile_side
+            tiles_needed = total_area // tile_area
+            l_tiles = length // tile_side
+            w_tiles = width // tile_side
+
+            steps = []
+            steps.append(("Problem Classification", "Topic: Tiling a Surface (Area-Based GCD).\nGoal: Pave a rectangular surface with identical largest possible square tiles."))
+            steps.append(("Step 1: Determine Largest Square Tile Size", 
+                          f"Dimensions of courtyard: Length = {length} m, Width = {width} m.\n"
+                          f"The side length of the largest possible square tile is gcd({length}, {width}).\n"
+                          f"gcd({length}, {width}) = {tile_side} m."))
+
+            steps.append(("Step 2: Compute Tile Dimensions & Area", 
+                          f"Largest Square Tile Dimensions: {tile_side} m × {tile_side} m.\n"
+                          f"Area of single tile = {tile_side} × {tile_side} = {tile_area} sq. m.\n"
+                          f"Total courtyard area = {length} × {width} = {total_area} sq. m."))
+
+            steps.append(("Step 3: Compute Minimum Tiles Required", 
+                          f"Total Tiles = Total Area / Tile Area = ({length} × {width}) / ({tile_side} × {tile_side})\n"
+                          f"Total Tiles = {l_tiles} × {w_tiles} = {tiles_needed} tiles."))
+
+            ans_str = f"(a) Tile Side: {tile_side} m × {tile_side} m | (b) Total Tiles: {tiles_needed}"
+            ans_latex = fr"\text{{Tile Size}} = {tile_side}\text{{ m}} \times {tile_side}\text{{ m}}, \quad \text{{Total Tiles}} = \mathbf{{{tiles_needed}}}"
+            steps.append(("Final Answer Summary", 
+                          f"(a) Dimensions of largest square tile: {tile_side} m × {tile_side} m\n"
+                          f"(b) Minimum number of tiles required: {tiles_needed} tiles."))
+
+            return steps, ans_str, {"gcd": tile_side, "tiles": tiles_needed, "latex_ans": ans_latex}
+
+    # Check Type 2: Cutting Without Waste (Planks / Rods / Ropes)
+    if any(k in t for k in ["plank", "planks", "wood", "wooden", "cut", "pieces", "waste", "leftover"]):
+        if len(nums) >= 2:
+            piece_len = math.gcd(*nums)
+            piece_counts = [x // piece_len for x in nums]
+            total_pieces = sum(piece_counts)
+
+            steps = []
+            steps.append(("Problem Classification", "Topic: Cutting Without Waste (Greatest Common Length).\nGoal: Cut materials into equal pieces of maximum possible length with no leftover."))
+            
+            lengths_str = ", ".join(f"{x} cm" for x in nums)
+            steps.append(("Step 1: Find Maximum Piece Length", 
+                          f"Given plank lengths: {lengths_str}.\n"
+                          f"Greatest possible length of each cut piece = gcd({', '.join(map(str, nums))}).\n"
+                          f"gcd({', '.join(map(str, nums))}) = {piece_len} cm."))
+
+            count_breakdown = [f"• Plank ({nums[i]} cm): {nums[i]} / {piece_len} = {piece_counts[i]} pieces" for i in range(len(nums))]
+            steps.append(("Step 2: Calculate Pieces per Plank & Total", 
+                          "Breakdown per plank:\n" + "\n".join(count_breakdown) + 
+                          f"\n\nTotal pieces = {' + '.join(map(str, piece_counts))} = {total_pieces} pieces."))
+
+            ans_str = f"(a) Piece Length: {piece_len} cm | (b) Total Pieces: {total_pieces}"
+            ans_latex = fr"\text{{Piece Length}} = {piece_len}\text{{ cm}}, \quad \text{{Total Pieces}} = \mathbf{{{total_pieces}}}"
+            steps.append(("Final Answer Summary", 
+                          f"(a) Length of each cut piece: {piece_len} cm\n"
+                          f"(b) Total pieces obtained: {total_pieces} pieces."))
+
+            return steps, ans_str, {"gcd": piece_len, "total_pieces": total_pieces, "latex_ans": ans_latex}
+
+    # Check Type 1: Equal Groups & Distribution (Pens, Pencils, Erasers, Baskets, Packs)
+    if len(nums) >= 2:
+        gcd_val = math.gcd(*nums)
+        per_pack = [x // gcd_val for x in nums]
+        
+        item_matches = re.findall(r"(\d+)\s+([a-zA-Z]+)", text)
+        items_dict = {}
+        for num_str, name in item_matches:
+            val = int(num_str)
+            if val in nums:
+                items_dict[val] = name.capitalize()
+
+        steps = []
+        steps.append(("Problem Classification", "Topic: Equal Groups & Distribution (Identical Packs).\nGoal: Divide items into identical gift packs with no items leftover."))
+        
+        items_str = ", ".join(f"{val} {items_dict.get(val, 'items')}" for val in nums) if items_dict else ", ".join(map(str, nums))
+        steps.append(("Step 1: Compute Maximum Identical Packs", 
+                      f"Quantities: {items_str}.\n"
+                      f"Maximum identical gift packs = gcd({', '.join(map(str, nums))}).\n"
+                      f"gcd({', '.join(map(str, nums))}) = {gcd_val} packs."))
+
+        pack_breakdown = []
+        for val in nums:
+            item_name = items_dict.get(val, f"Item ({val})")
+            pack_breakdown.append(f"• {item_name}: {val} / {gcd_val} = {val // gcd_val}")
+
+        steps.append(("Step 2: Calculate Contents per Pack", 
+                      "Items per single pack:\n" + "\n".join(pack_breakdown)))
+
+        breakdown_summary = ", ".join(f"{val // gcd_val} {items_dict.get(val, 'items')}" for val in nums)
+        ans_str = f"(a) Max Gift Packs: {gcd_val} | (b) Per Pack: {breakdown_summary}"
+        ans_latex = fr"\text{{Max Packs}} = \mathbf{{{gcd_val}}}, \quad \text{{Contents/Pack}} = \mathbf{{{breakdown_summary}}}"
+        steps.append(("Final Answer Summary", 
+                      f"(a) Maximum number of gift packs: {gcd_val}\n"
+                      f"(b) Contents per pack: {breakdown_summary}."))
+
+        return steps, ans_str, {"gcd": gcd_val, "per_pack": per_pack, "latex_ans": ans_latex}
+
+    return solve_gcd_multi(nums)
 
 
 
@@ -1339,7 +1551,7 @@ if page == "🏠 Home":
     st.caption("Quick sample questions:")
     sample_qs = {
         "divisibility": "Prime factorization and divisors of 360",
-        "gcd": "Find GCD of 1071 and 462 using Euclid's algorithm",
+        "gcd": "A teacher has 48 pens, 64 pencils, and 80 erasers. She wants to create identical gift packs for students with no items leftover. What is the maximum number of gift packs she can make?",
         "complex": "Convert z = 1 + 1.73205i to polar form",
         "perm": "Permutations P(7, 3) of 7 distinct objects",
         "comb": "Choose 4 members from a group of 9 available employees",
@@ -1348,7 +1560,7 @@ if page == "🏠 Home":
     }
 
     c1, c2, c3 = st.columns(3)
-    c1.button("💡 GCD: 1071 & 462", on_click=set_nav_page, args=("🧮 Computation of GCD using Euclid’s Algorithm", sample_qs["gcd"]))
+    c1.button("💡 Gift Packs: 48, 64, 80", on_click=set_nav_page, args=("🧮 Computation of GCD using Euclid’s Algorithm", sample_qs["gcd"]))
     c2.button("💡 Choose 4 from 9", on_click=set_nav_page, args=("🎲 Combinations of Distinct Objects", sample_qs["comb"]))
     c3.button("💡 Divisors of 360", on_click=set_nav_page, args=("🔢 Integers & Divisibility", sample_qs["divisibility"]))
 
@@ -1451,15 +1663,24 @@ elif page in TOPIC_NAV_MAP.values():
 
 
     elif topic_key == "gcd":
-        c1, c2 = st.columns(2)
-        default_a = parsed_params.get("a", 1071) if topic_key == detected_topic else 1071
-        default_b = parsed_params.get("b", 462) if topic_key == detected_topic else 462
-        a_val = c1.number_input("Integer a", value=int(default_a), step=1)
-        b_val = c2.number_input("Integer b", value=int(default_b), step=1)
-        if st.button("Solve step-by-step", type="primary") or auto_trigger:
-            steps, answer, extra = solve_gcd_euclidean(a_val, b_val)
-            if not question_text:
-                question_text = f"Compute gcd({a_val}, {b_val}) strictly using Euclid's division algorithm and Extended Euclidean Bézout identity."
+        is_wp = parsed_params.get("is_word_problem", False) if topic_key == detected_topic else False
+        nums = parsed_params.get("nums", []) if topic_key == detected_topic else []
+        
+        if (question_text and is_wp) or len(nums) > 2:
+            steps, answer, extra = solve_gcd_word_problem(question_text)
+        else:
+            c1, c2 = st.columns(2)
+            default_a = parsed_params.get("a", 1071) if topic_key == detected_topic else 1071
+            default_b = parsed_params.get("b", 462) if topic_key == detected_topic else 462
+            a_val = c1.number_input("Integer a", value=int(default_a), step=1)
+            b_val = c2.number_input("Integer b", value=int(default_b), step=1)
+            if st.button("Solve step-by-step", type="primary") or auto_trigger:
+                if len(nums) > 2:
+                    steps, answer, extra = solve_gcd_multi(nums)
+                else:
+                    steps, answer, extra = solve_gcd_euclidean(a_val, b_val)
+                if not question_text:
+                    question_text = f"Compute gcd({a_val}, {b_val}) strictly using Euclid's division algorithm and Extended Euclidean Bézout identity."
 
     elif topic_key == "complex":
         c1, c2 = st.columns(2)
@@ -1566,7 +1787,7 @@ elif page in TOPIC_NAV_MAP.values():
             st.markdown("### 📚 STEP-BY-STEP REASONING")
             render_step_timeline(steps)
 
-            if topic_key == "gcd":
+            if topic_key == "gcd" and "table_rows" in extra:
                 st.markdown("### 📊 Extended Euclidean Table (Textbook Method)")
                 render_euclidean_html_table(extra["table_rows"])
             elif topic_key in ["functions", "inverse_image"]:
