@@ -303,6 +303,114 @@ st.markdown(f"""
         font-weight: 600;
         margin-bottom: 12px;
     }}
+
+    /* Math Formula KaTeX Mobile Scroll & Responsiveness */
+    .stKatex, div[data-testid="stKatex"] {{
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        max-width: 100% !important;
+        padding: 4px 0 !important;
+        -webkit-overflow-scrolling: touch;
+    }}
+
+    /* Touch Targets & Mobile Adaptations */
+    .stButton > button {{
+        min-height: 44px;
+    }}
+
+    @media (max-width: 768px) {{
+        .main .block-container {{
+            padding-top: 0.9rem !important;
+            padding-bottom: 2.0rem !important;
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }}
+        
+        .hero-title {{
+            font-size: 1.85rem !important;
+            margin-bottom: 0.3rem !important;
+        }}
+        
+        .hero-subtitle {{
+            font-size: 0.9rem !important;
+            margin-bottom: 1.0rem !important;
+        }}
+        
+        .hero-symbol-banner {{
+            font-size: 1.1rem !important;
+            letter-spacing: 0.2rem !important;
+            margin-bottom: 0px !important;
+        }}
+        
+        .glass-card {{
+            padding: 14px 16px !important;
+            margin-bottom: 12px !important;
+            border-radius: 12px !important;
+        }}
+        
+        .timeline-step {{
+            margin-bottom: 10px !important;
+        }}
+        
+        .timeline-num {{
+            width: 26px !important;
+            height: 26px !important;
+            font-size: 0.8rem !important;
+            margin-right: 10px !important;
+        }}
+        
+        .timeline-content {{
+            padding: 10px 12px !important;
+            border-radius: 10px !important;
+        }}
+        
+        .timeline-title {{
+            font-size: 0.95rem !important;
+        }}
+        
+        .timeline-body {{
+            font-size: 0.86rem !important;
+            word-break: break-word !important;
+        }}
+        
+        .answer-card {{
+            padding: 16px 12px !important;
+            margin-top: 12px !important;
+            border-radius: 12px !important;
+        }}
+        
+        .answer-badge {{
+            font-size: 0.75rem !important;
+        }}
+        
+        .answer-value {{
+            font-size: 1.35rem !important;
+            word-break: break-word !important;
+            overflow-x: auto !important;
+        }}
+        
+        .understand-card {{
+            padding: 12px 14px !important;
+            margin-top: 14px !important;
+        }}
+
+        .understand-title {{
+            font-size: 0.88rem !important;
+        }}
+        
+        .stButton > button {{
+            width: 100% !important;
+            margin-bottom: 4px !important;
+        }}
+        
+        div[data-testid="stHorizontalBlock"] {{
+            gap: 0.5rem !important;
+        }}
+        
+        input, textarea, select {{
+            font-size: 16px !important;
+        }}
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1560,9 +1668,9 @@ if page == "🏠 Home":
     }
 
     c1, c2, c3 = st.columns(3)
-    c1.button("💡 Gift Packs: 48, 64, 80", on_click=set_nav_page, args=("🧮 Computation of GCD using Euclid’s Algorithm", sample_qs["gcd"]))
-    c2.button("💡 Choose 4 from 9", on_click=set_nav_page, args=("🎲 Combinations of Distinct Objects", sample_qs["comb"]))
-    c3.button("💡 Divisors of 360", on_click=set_nav_page, args=("🔢 Integers & Divisibility", sample_qs["divisibility"]))
+    c1.button("💡 Gift Packs: 48, 64, 80", use_container_width=True, on_click=set_nav_page, args=("🧮 Computation of GCD using Euclid’s Algorithm", sample_qs["gcd"]))
+    c2.button("💡 Choose 4 from 9", use_container_width=True, on_click=set_nav_page, args=("🎲 Combinations of Distinct Objects", sample_qs["comb"]))
+    c3.button("💡 Divisors of 360", use_container_width=True, on_click=set_nav_page, args=("🔢 Integers & Divisibility", sample_qs["divisibility"]))
 
     def handle_home_solve():
         q = st.session_state.get("home_question_input", "").strip()
@@ -1594,7 +1702,7 @@ if page == "🏠 Home":
                 <div style="font-size:0.88rem; color:rgba(247,245,239,0.8); line-height:1.4; margin-bottom:12px;">{desc}</div>
             </div>
             """, unsafe_allow_html=True)
-            st.button(f"Explore →", key=f"btn_u1_{key}", on_click=set_nav_page, args=(TOPIC_NAV_MAP[key], sample_qs[key]))
+            st.button(f"Explore →", key=f"btn_u1_{key}", use_container_width=True, on_click=set_nav_page, args=(TOPIC_NAV_MAP[key], sample_qs[key]))
 
     st.markdown("<div style='margin-top:20px;'></div>", unsafe_allow_html=True)
     st.markdown("### 📚 UNIT II: Basic Counting & Basics of Functions")
@@ -1615,7 +1723,7 @@ if page == "🏠 Home":
                 <div style="font-size:0.88rem; color:rgba(247,245,239,0.8); line-height:1.4; margin-bottom:12px;">{desc}</div>
             </div>
             """, unsafe_allow_html=True)
-            st.button(f"Explore →", key=f"btn_u2_{key}", on_click=set_nav_page, args=(TOPIC_NAV_MAP[key], sample_qs[key]))
+            st.button(f"Explore →", key=f"btn_u2_{key}", use_container_width=True, on_click=set_nav_page, args=(TOPIC_NAV_MAP[key], sample_qs[key]))
 
 
 # ============================================================
@@ -1798,7 +1906,7 @@ elif page in TOPIC_NAV_MAP.values():
                     mapping,
                     highlight_target_set=extra.get("target_set", [])
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': False})
 
 
         with info_col:
