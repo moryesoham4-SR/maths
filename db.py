@@ -48,13 +48,14 @@ def get_supabase_client():
 
 
 def init_db():
-    """Ensure SQLite fallback tables exist."""
+    """Ensure SQLite fallback tables exist with multi-user support columns."""
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS solutions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT DEFAULT 'default_user',
             question TEXT,
             topic TEXT,
             answer TEXT,
@@ -65,20 +66,40 @@ def init_db():
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS user_stats (
             id INTEGER PRIMARY KEY DEFAULT 1,
+            user_id TEXT DEFAULT 'default_user',
             streak INTEGER DEFAULT 0,
             xp INTEGER DEFAULT 0,
             quiz_correct INTEGER DEFAULT 0,
             quiz_total INTEGER DEFAULT 0,
+            problems_solved INTEGER DEFAULT 0,
+            last_active_date TEXT,
             updated_at TEXT
         )
         """)
+        # Migrations for existing user_stats table
+        cursor.execute("PRAGMA table_info(user_stats)")
+        cols = [col[1] for col in cursor.fetchall()]
+        if "last_active_date" not in cols:
+            cursor.execute("ALTER TABLE user_stats ADD COLUMN last_active_date TEXT")
+        if "problems_solved" not in cols:
+            cursor.execute("ALTER TABLE user_stats ADD COLUMN problems_solved INTEGER DEFAULT 0")
+        if "user_id" not in cols:
+            cursor.execute("ALTER TABLE user_stats ADD COLUMN user_id TEXT DEFAULT 'default_user'")
+
+        # Migration for solutions table
+        cursor.execute("PRAGMA table_info(solutions)")
+        sol_cols = [col[1] for col in cursor.fetchall()]
+        if "user_id" not in sol_cols:
+            cursor.execute("ALTER TABLE solutions ADD COLUMN user_id TEXT DEFAULT 'default_user'")
+
         # Ensure default stats row exists
         cursor.execute("SELECT COUNT(*) FROM user_stats WHERE id = 1")
         if cursor.fetchone()[0] == 0:
             cursor.execute("""
-            INSERT INTO user_stats (id, streak, xp, quiz_correct, quiz_total, updated_at)
-            VALUES (1, 0, 0, 0, 0, ?)
-            """, (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
+            INSERT INTO user_stats (id, user_id, streak, xp, quiz_correct, quiz_total, problems_solved, last_active_date, updated_at)
+            VALUES (1, 'default_user', 0, 0, 0, 0, 0, ?, ?)
+            """, (datetime.now().strftime("%Y-%m-%d"), datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
         conn.commit()
         conn.close()
     except Exception as e:
@@ -94,7 +115,7 @@ def is_supabase_connected() -> bool:
     return get_supabase_client() is not None
 
 
-def save_solution(question: str, topic: str, answer: str, steps: list = None):
+def save_solution(question: str, topic: str, answer: str, steps: list = None, user_id: str = "default_user"):
     """Save a solved problem into Supabase or SQLite fallback."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     steps_str = json.dumps(steps or [])
@@ -103,6 +124,7 @@ def save_solution(question: str, topic: str, answer: str, steps: list = None):
     if sp:
         try:
             sp.table("solutions").insert({
+                "user_id": user_id,
                 "question": question,
                 "topic": topic,
                 "answer": answer,
@@ -118,21 +140,24 @@ def save_solution(question: str, topic: str, answer: str, steps: list = None):
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute("""
-        INSERT INTO solutions (question, topic, answer, steps_json, created_at)
-        VALUES (?, ?, ?, ?, ?)
-        """, (question, topic, answer, steps_str, now))
+        INSERT INTO solutions (user_id, question, topic, answer, steps_json, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """, (user_id, question, topic, answer, steps_str, now))
         conn.commit()
         conn.close()
     except Exception as e:
         print(f"SQLite save_solution error: {e}")
 
 
-def fetch_history(limit: int = 50) -> list:
+def fetch_history(limit: int = 50, topic_filter: str = None) -> list:
     """Fetch recent solution history from Supabase or SQLite fallback."""
     sp = get_supabase_client()
     if sp:
         try:
-            res = sp.table("solutions").select("*").order("created_at", desc=True).limit(limit).execute()
+            q = sp.table("solutions").select("*")
+            if topic_filter and topic_filter != "All":
+                q = q.eq("topic", topic_filter)
+            res = q.order("created_at", desc=True).limit(limit).execute()
             if res.data:
                 history = []
                 for row in res.data:
@@ -152,12 +177,21 @@ def fetch_history(limit: int = 50) -> list:
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
-        cursor.execute("""
-        SELECT question, topic, answer, steps_json, created_at
-        FROM solutions
-        ORDER BY id DESC
-        LIMIT ?
-        """, (limit,))
+        if topic_filter and topic_filter != "All":
+            cursor.execute("""
+            SELECT question, topic, answer, steps_json, created_at
+            FROM solutions
+            WHERE topic = ?
+            ORDER BY id DESC
+            LIMIT ?
+            """, (topic_filter, limit))
+        else:
+            cursor.execute("""
+            SELECT question, topic, answer, steps_json, created_at
+            FROM solutions
+            ORDER BY id DESC
+            LIMIT ?
+            """, (limit,))
         rows = cursor.fetchall()
         conn.close()
         for q, t, a, s, created in rows:
@@ -174,8 +208,8 @@ def fetch_history(limit: int = 50) -> list:
     return history
 
 
-def load_user_stats() -> dict:
-    """Load persistent user stats (streak, xp, quiz accuracy)."""
+def load_user_stats(user_id: str = "default_user") -> dict:
+    """Load persistent user stats (streak, xp, quiz accuracy, problems_solved, last_active_date)."""
     sp = get_supabase_client()
     if sp:
         try:
@@ -186,7 +220,9 @@ def load_user_stats() -> dict:
                     "streak": row.get("streak", 0),
                     "xp": row.get("xp", 0),
                     "quiz_correct": row.get("quiz_correct", 0),
-                    "quiz_total": row.get("quiz_total", 0)
+                    "quiz_total": row.get("quiz_total", 0),
+                    "problems_solved": row.get("problems_solved", 0),
+                    "last_active_date": row.get("last_active_date", "")
                 }
         except Exception as e:
             print(f"Supabase load_user_stats error ({e}), reading SQLite.")
@@ -195,34 +231,42 @@ def load_user_stats() -> dict:
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
-        cursor.execute("SELECT streak, xp, quiz_correct, quiz_total FROM user_stats WHERE id = 1")
+        cursor.execute("SELECT streak, xp, quiz_correct, quiz_total, problems_solved, last_active_date FROM user_stats WHERE id = 1")
         row = cursor.fetchone()
         conn.close()
         if row:
             return {
-                "streak": row[0],
-                "xp": row[1],
-                "quiz_correct": row[2],
-                "quiz_total": row[3]
+                "streak": row[0] or 0,
+                "xp": row[1] or 0,
+                "quiz_correct": row[2] or 0,
+                "quiz_total": row[3] or 0,
+                "problems_solved": row[4] or 0,
+                "last_active_date": row[5] or ""
             }
     except Exception as e:
         print(f"SQLite load_user_stats error: {e}")
 
-    return {"streak": 0, "xp": 0, "quiz_correct": 0, "quiz_total": 0}
+    return {"streak": 0, "xp": 0, "quiz_correct": 0, "quiz_total": 0, "problems_solved": 0, "last_active_date": ""}
 
 
-def save_user_stats(streak: int, xp: int, quiz_correct: int, quiz_total: int):
+def save_user_stats(streak: int, xp: int, quiz_correct: int, quiz_total: int, last_active_date: str = None, problems_solved: int = 0):
     """Update user stats in Supabase or SQLite fallback."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if not last_active_date:
+        last_active_date = datetime.now().strftime("%Y-%m-%d")
+
     sp = get_supabase_client()
     if sp:
         try:
             sp.table("user_stats").upsert({
                 "id": 1,
+                "user_id": "default_user",
                 "streak": streak,
                 "xp": xp,
                 "quiz_correct": quiz_correct,
                 "quiz_total": quiz_total,
+                "problems_solved": problems_solved,
+                "last_active_date": last_active_date,
                 "updated_at": now
             }).execute()
             return
@@ -235,9 +279,9 @@ def save_user_stats(streak: int, xp: int, quiz_correct: int, quiz_total: int):
         cursor = conn.cursor()
         cursor.execute("""
         UPDATE user_stats
-        SET streak = ?, xp = ?, quiz_correct = ?, quiz_total = ?, updated_at = ?
+        SET streak = ?, xp = ?, quiz_correct = ?, quiz_total = ?, problems_solved = ?, last_active_date = ?, updated_at = ?
         WHERE id = 1
-        """, (streak, xp, quiz_correct, quiz_total, now))
+        """, (streak, xp, quiz_correct, quiz_total, problems_solved, last_active_date, now))
         conn.commit()
         conn.close()
     except Exception as e:
@@ -245,7 +289,8 @@ def save_user_stats(streak: int, xp: int, quiz_correct: int, quiz_total: int):
 
 
 def fetch_user_stats():
-    """Wrapper returning tuple (streak, xp, quiz_correct, quiz_total)."""
+    """Wrapper returning tuple (streak, xp, quiz_correct, quiz_total, problems_solved)."""
     s = load_user_stats()
-    return s.get("streak", 0), s.get("xp", 0), s.get("quiz_correct", 0), s.get("quiz_total", 0)
+    return s.get("streak", 0), s.get("xp", 0), s.get("quiz_correct", 0), s.get("quiz_total", 0), s.get("problems_solved", 0)
+
 
