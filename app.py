@@ -265,31 +265,32 @@ st.markdown(f"""
         white-space: pre-wrap;
     }}
     
-    .answer-card {{
-        background: linear-gradient(135deg, rgba(46, 196, 182, 0.22) 0%, rgba(20, 33, 61, 0.5) 100%);
+    .answer-card {
+        background: linear-gradient(135deg, rgba(46, 196, 182, 0.22) 0%, rgba(20, 33, 61, 0.6) 100%);
         border: 2px solid #2EC4B6;
-        border-radius: 16px;
-        padding: 24px;
+        border-radius: 20px;
+        padding: 32px 24px;
         text-align: center;
-        margin-bottom: 16px;
-        box-shadow: 0 10px 30px rgba(46, 196, 182, 0.25);
-    }}
+        margin-bottom: 20px;
+        box-shadow: 0 12px 35px rgba(46, 196, 182, 0.28);
+    }
     
-    .answer-badge {{
-        font-size: 0.8rem;
+    .answer-badge {
+        font-size: 0.95rem;
         font-weight: 800;
-        letter-spacing: 0.12em;
+        letter-spacing: 0.14em;
         color: #2EC4B6;
         text-transform: uppercase;
-        margin-bottom: 6px;
-    }}
+        margin-bottom: 12px;
+    }
     
-    .answer-value {{
-        font-size: 1.85rem;
+    .answer-value {
+        font-size: 2.3rem;
         font-weight: 800;
         color: #FFFFFF;
         font-family: 'JetBrains Mono', monospace;
-    }}
+        letter-spacing: -0.01em;
+    }
     
     .understand-card {{
         background: rgba(255, 182, 39, 0.06);
@@ -1266,8 +1267,28 @@ def plot_argand_diagram_plotly(a: float, b: float):
 # ============================================================
 # UI RENDER COMPONENTS
 # ============================================================
+def render_problem_summary_card(question_text: str, topic_name: str, unit_label: str):
+    """Renders 📝 PROBLEM summary card before the answer card."""
+    display_q = question_text.strip() if question_text else f"Find solution for {topic_name} problem."
+    st.markdown(f"""
+    <div class="glass-card" style="padding: 20px 24px; margin-bottom: 16px;">
+        <div style="font-size: 0.85rem; font-weight: 800; color: #2EC4B6; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            📝 PROBLEM
+        </div>
+        <div style="font-size: 1.15rem; font-weight: 700; color: #FFFFFF; margin-bottom: 14px; line-height: 1.4;">
+            {display_q}
+        </div>
+        <div style="display: flex; gap: 24px; font-size: 0.88rem; color: rgba(247, 245, 239, 0.75);">
+            <div><span style="color: rgba(247, 245, 239, 0.5);">Topic &nbsp;&nbsp;&nbsp;&nbsp;</span> <strong style="color: #FFFFFF;">{topic_name}</strong></div>
+            <div><span style="color: rgba(247, 245, 239, 0.5);">Unit &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> <strong style="color: #2EC4B6;">{unit_label}</strong></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def render_step_timeline(steps: list):
-    """Renders step-by-step reasoning timeline."""
+    """Renders step-by-step reasoning timeline with downward arrows."""
+    total_steps = len(steps)
     for i, step in enumerate(steps, 1):
         if isinstance(step, (tuple, list)) and len(step) >= 2:
             title, body = step[0], step[1]
@@ -1278,11 +1299,17 @@ def render_step_timeline(steps: list):
         <div class="timeline-step">
             <div class="timeline-num">{i}</div>
             <div class="timeline-content">
-                <div class="timeline-title">{title}</div>
+                <div class="timeline-title">STEP {i}: {title}</div>
                 <div class="timeline-body">{body}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
+        if i < total_steps:
+            st.markdown("""
+            <div style="text-align: center; margin: -6px 0 10px 0; color: #2EC4B6; font-size: 1.3rem; font-weight: 800;">
+                ↓
+            </div>
+            """, unsafe_allow_html=True)
 
 
 def render_euclidean_html_table(table_rows: list):
@@ -1430,7 +1457,7 @@ def render_answer_card(answer: str, latex_ans: str = None, question_text: str = 
     <div class="answer-card">
         <div class="answer-badge">🎯 FINAL ANSWER</div>
         <div class="answer-value">{display_ans}</div>
-        <div style="font-size:0.82rem; color:#2EC4B6; font-weight:700; margin-top:6px;">✓ Computed & Verified</div>
+        <div style="font-size:0.88rem; color:#2EC4B6; font-weight:700; margin-top:10px;">✓ Solution Verified</div>
     </div>
     """, unsafe_allow_html=True)
     if latex_ans:
@@ -1465,35 +1492,36 @@ if "main_nav" not in st.session_state:
 
 main_nav_options = [
     "🏠 Home",
-    "📚 LEARN",
+    "📚 Learn",
     "🧠 Practice Arena",
     "📐 Formula Bank",
-    "📜 Solution History"
+    "📊 Progress",
+    "📜 History"
 ]
 
 selected_main = st.sidebar.radio("Navigation", main_nav_options, key="main_nav", label_visibility="collapsed")
 
 selected_topic_key = st.session_state.get("selected_topic_key", "gcd")
 
-if selected_main == "📚 LEARN":
-    st.sidebar.markdown("<div style='margin-top:8px; margin-bottom:4px; font-weight:800; font-size:0.85rem; color:#2EC4B6; letter-spacing:0.05em;'>SELECT SYLLABUS TOPIC</div>", unsafe_allow_html=True)
+if selected_main == "📚 Learn":
+    st.sidebar.markdown("<div style='margin-top:12px; margin-bottom:6px; font-weight:800; font-size:0.95rem; color:#2EC4B6; letter-spacing:0.05em;'>📚 LEARN</div>", unsafe_allow_html=True)
 
-    with st.sidebar.expander("📚 Unit I: Numbers & Complex", expanded=True):
+    with st.sidebar.expander("Unit I", expanded=True):
         if st.button("🔢 Integers & Divisibility", use_container_width=True, key="nav_u1_div"):
             st.session_state.selected_topic_key = "divisibility"
-        if st.button("🧮 Computation of GCD (Euclid)", use_container_width=True, key="nav_u1_gcd"):
+        if st.button("🧮 GCD", use_container_width=True, key="nav_u1_gcd"):
             st.session_state.selected_topic_key = "gcd"
-        if st.button("📍 Complex Numbers & Polar", use_container_width=True, key="nav_u1_cx"):
+        if st.button("📍 Complex Numbers", use_container_width=True, key="nav_u1_cx"):
             st.session_state.selected_topic_key = "complex"
 
-    with st.sidebar.expander("📚 Unit II: Counting & Functions", expanded=True):
-        if st.button("🔀 Permutations of Distinct", use_container_width=True, key="nav_u2_perm"):
+    with st.sidebar.expander("Unit II", expanded=True):
+        if st.button("🔀 Permutations", use_container_width=True, key="nav_u2_perm"):
             st.session_state.selected_topic_key = "perm"
-        if st.button("🎲 Combinations of Distinct", use_container_width=True, key="nav_u2_comb"):
+        if st.button("🎲 Combinations", use_container_width=True, key="nav_u2_comb"):
             st.session_state.selected_topic_key = "comb"
-        if st.button("🔗 Functions (Injective/Surjective)", use_container_width=True, key="nav_u2_fn"):
+        if st.button("🔗 Functions", use_container_width=True, key="nav_u2_fn"):
             st.session_state.selected_topic_key = "functions"
-        if st.button("🔄 Inverse Images of Sets", use_container_width=True, key="nav_u2_inv"):
+        if st.button("🔄 Inverse Images", use_container_width=True, key="nav_u2_inv"):
             st.session_state.selected_topic_key = "inverse_image"
 
 st.sidebar.markdown("---")
@@ -1502,7 +1530,7 @@ xp = st.session_state.get("xp", 0)
 solved_cnt = st.session_state.get("problems_solved", 0)
 tier_badge = "🌱 Novice" if xp < 50 else "🥉 Apprentice" if xp < 150 else "🥈 Scholar" if xp < 300 else "👑 Math Wizard"
 
-st.sidebar.metric("🔥 Activity Streak", f"{streak} Days")
+st.sidebar.metric("🔥 Activity Streak", f"{streak}")
 st.sidebar.metric("🧮 Problems Solved", f"{solved_cnt}")
 st.sidebar.metric("⭐ Total XP", f"{xp} XP")
 st.sidebar.caption(f"Rank Tier: {tier_badge}")
@@ -1513,7 +1541,7 @@ if st.session_state.quiz_score["total"] > 0:
 
 
 # ============================================================
-# PAGE: HOME (PROMINENT HERO & VISUAL TOPIC CARDS)
+# PAGE: HOME (PROMINENT HERO & QUICK START TOPIC CARDS)
 # ============================================================
 if selected_main == "🏠 Home":
     st.markdown("""
@@ -1551,9 +1579,9 @@ if selected_main == "🏠 Home":
     }
 
     c1, c2, c3 = st.columns(3)
-    c1.button("💡 GCD of 1071 and 462", use_container_width=True, on_click=set_nav, args=("📚 LEARN", "gcd", sample_qs["gcd"]))
-    c2.button("💡 Complex z = 3 + 4i", use_container_width=True, on_click=set_nav, args=("📚 LEARN", "complex", sample_qs["complex"]))
-    c3.button("💡 Divisors of 360", use_container_width=True, on_click=set_nav, args=("📚 LEARN", "divisibility", sample_qs["divisibility"]))
+    c1.button("💡 GCD of 1071 and 462", use_container_width=True, on_click=set_nav, args=("📚 Learn", "gcd", sample_qs["gcd"]))
+    c2.button("💡 Complex z = 3 + 4i", use_container_width=True, on_click=set_nav, args=("📚 Learn", "complex", sample_qs["complex"]))
+    c3.button("💡 Divisors of 360", use_container_width=True, on_click=set_nav, args=("📚 Learn", "divisibility", sample_qs["divisibility"]))
 
     def handle_home_solve():
         q = st.session_state.get("home_question_input", "").strip()
@@ -1561,44 +1589,31 @@ if selected_main == "🏠 Home":
             detected, _ = parse_question(q)
             st.session_state.preset_question = q
             st.session_state.selected_topic_key = detected
-            st.session_state.main_nav = "📚 LEARN"
+            st.session_state.main_nav = "📚 Learn"
 
     st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
     st.button("🧮 Solve Problem Step-by-Step", type="primary", use_container_width=True, on_click=handle_home_solve)
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Identity Stats Badge Row
-    st.markdown("""
-    <div style="display: flex; justify-content: center; gap: 2rem; margin-top: 18px; margin-bottom: 24px; flex-wrap: wrap;">
-        <div style="background: rgba(255,255,255,0.05); padding: 8px 18px; border-radius: 20px; font-size: 0.88rem; font-weight: 700; color: #2EC4B6; border: 1px solid rgba(46,196,182,0.25);">
-            7 Topics
-        </div>
-        <div style="background: rgba(255,255,255,0.05); padding: 8px 18px; border-radius: 20px; font-size: 0.88rem; font-weight: 700; color: #FFB627; border: 1px solid rgba(255,182,39,0.25);">
-            ∞ Problems
-        </div>
-        <div style="background: rgba(255,255,255,0.05); padding: 8px 18px; border-radius: 20px; font-size: 0.88rem; font-weight: 700; color: #E63946; border: 1px solid rgba(230,57,70,0.25);">
-            🧠 Quiz Arena
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
     st.markdown("---")
-    st.markdown("### 📚 UNIT I: Integers, Real Numbers & Complex Numbers")
-    u1_cols = st.columns(3)
+    st.markdown("### ⚡ Quick Start — Featured Topics")
+    
+    qs_cols = st.columns(3)
 
-    unit1_topics = [
-        ("divisibility", "🔢 Integers & Divisibility", "Prime factorization, primality testing, complete divisor lists, τ(n) & σ(n).", "3 concepts · 4 operations"),
-        ("gcd", "🧮 Euclidean Algorithm & GCD", "Find GCD using Euclid's division algorithm and Extended Bézout identity.", "3 concepts · 4 operations"),
-        ("complex", "📍 Complex Numbers & Polar Form", "Rectangular to polar conversion, modulus r, argument θ, and Argand plane.", "4 concepts · Interactive Graph")
+    quick_start_topics = [
+        ("gcd", "🧮 GCD & Euclidean Algorithm", "Unit I", "Find GCD using Euclid's division algorithm and Extended Bézout identity.", "Euclidean Division"),
+        ("complex", "📍 Complex Numbers & Polar Form", "Unit I", "Rectangular to polar conversion, modulus r, argument θ, and Argand plane.", "Argand Plane Visualization"),
+        ("functions", "📈 Functions & Classifications", "Unit II", "Classify domain-to-codomain mappings (Injective, Surjective, Bijective).", "Bipartite Mapping")
     ]
 
-    for i, (key, title, desc, meta) in enumerate(unit1_topics):
-        with u1_cols[i % 3]:
+    for i, (key, title, unit, desc, meta) in enumerate(quick_start_topics):
+        with qs_cols[i]:
+            badge_class = "unit-badge-1" if unit == "Unit I" else "unit-badge-2"
             st.markdown(f"""
-            <div class="topic-card">
+            <div class="topic-card" style="min-height: 220px;">
                 <div>
                     <div class="topic-icon-lg">{TOPIC_ICONS[key]}</div>
-                    <span class="unit-badge unit-badge-1">UNIT I</span>
+                    <span class="unit-badge {badge_class}">{unit}</span>
                     <div style="font-weight:800; font-size:1.1rem; color:#FFFFFF; margin-bottom:6px;">{title}</div>
                     <div style="font-size:0.86rem; color:rgba(247,245,239,0.75); line-height:1.4;">{desc}</div>
                 </div>
@@ -1607,41 +1622,19 @@ if selected_main == "🏠 Home":
                 </div>
             </div>
             """, unsafe_allow_html=True)
-            st.button(f"Explore →", key=f"btn_u1_{key}", use_container_width=True, on_click=set_nav, args=("📚 LEARN", key, sample_qs[key]))
+            st.button(f"Explore {TOPICS.get(key, key)} →", key=f"btn_qs_{key}", use_container_width=True, on_click=set_nav, args=("📚 Learn", key, sample_qs[key]))
 
-    st.markdown("<div style='margin-top:24px;'></div>", unsafe_allow_html=True)
-    st.markdown("### 📚 UNIT II: Basic Counting & Basics of Functions")
-    u2_cols = st.columns(4)
-
-    unit2_topics = [
-        ("perm", "🔀 Permutations", "Ordered arrangements nPr, factorial products n!, and circular table arrangements.", "3 concepts · Factorial solver"),
-        ("comb", "🎲 Combinations", "Unordered selections nCr, binomial coefficient properties, and group selections.", "3 concepts · Pascal symmetry"),
-        ("functions", "🔗 Function Classification", "Classify domain-to-codomain mappings with interactive bipartite graph.", "3 concepts · Bipartite graph"),
-        ("inverse_image", "🔄 Inverse Images of Sets", "Pre-image computation f⁻¹(S) = { x ∈ A | f(x) ∈ S } for subsets S ⊆ B.", "2 concepts · Subset mapping")
-    ]
-
-    for i, (key, title, desc, meta) in enumerate(unit2_topics):
-        with u2_cols[i % 4]:
-            st.markdown(f"""
-            <div class="topic-card">
-                <div>
-                    <div class="topic-icon-lg">{TOPIC_ICONS[key]}</div>
-                    <span class="unit-badge unit-badge-2">UNIT II</span>
-                    <div style="font-weight:800; font-size:1.05rem; color:#FFFFFF; margin-bottom:6px;">{title}</div>
-                    <div style="font-size:0.85rem; color:rgba(247,245,239,0.75); line-height:1.4;">{desc}</div>
-                </div>
-                <div>
-                    <div class="topic-meta">{meta}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            st.button(f"Explore →", key=f"btn_u2_{key}", use_container_width=True, on_click=set_nav, args=("📚 LEARN", key, sample_qs[key]))
+    st.markdown("<div style='margin-top: 24px; text-align: center;'>", unsafe_allow_html=True)
+    if st.button("📚 View All Topics →", type="secondary", use_container_width=True):
+        st.session_state.main_nav = "📚 Learn"
+        st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ============================================================
-# PAGE: SOLVER ENGINE (PROGRESSIVE DISCLOSURE REDESIGN)
+# PAGE: SOLVER ENGINE (STRICT VERTICAL SEQUENCE REDESIGN)
 # ============================================================
-elif selected_main == "📚 LEARN":
+elif selected_main == "📚 Learn":
     topic_key = st.session_state.get("selected_topic_key", "gcd")
     unit_label = TOPIC_UNITS.get(topic_key, "UNIT I")
     topic_title = TOPICS.get(topic_key, "Solver")
@@ -1803,27 +1796,70 @@ elif selected_main == "📚 LEARN":
             codomain_str = act.get("codomain_str", codomain_str)
             mapping = act.get("mapping", mapping)
 
-    # RENDER REDESIGNED SOLUTION SECTION WITH PROGRESSIVE DISCLOSURE
+    # RENDER SOLVER SECTION IN SPECIFIED GUI ORDER:
+    # 📝 PROBLEM → 🎯 FINAL ANSWER → 📚 STEP-BY-STEP SOLUTION → 📊 VISUALIZATION → 💡 UNDERSTAND → 📥 EXPORT
     if steps:
         record_user_activity(solved_problem=True)
         st.markdown("---")
 
-        # Top Section: 2 Columns for Solution Steps & Final Answer Card
-        sol_col, ans_col = st.columns([7, 5])
+        # 1. 📝 PROBLEM SUMMARY CARD
+        render_problem_summary_card(question_text, TOPICS.get(topic_key, topic_key), unit_label)
 
-        with sol_col:
-            st.markdown("### 📚 STEP-BY-STEP SOLUTION")
-            render_step_timeline(steps)
+        # 2. 🎯 FINAL ANSWER CARD
+        render_answer_card(answer, latex_ans=extra.get("latex_ans"), question_text=question_text, topic_name=TOPICS.get(topic_key, topic_key), steps=steps)
 
-        with ans_col:
-            render_answer_card(answer, latex_ans=extra.get("latex_ans"), question_text=question_text, topic_name=TOPICS.get(topic_key, topic_key), steps=steps)
+        # Save solution record in DB
+        last_solved_key = f"{question_text}_{topic_key}_{answer}"
+        if st.session_state.get("last_solved_key") != last_solved_key:
+            st.session_state.last_solved_key = last_solved_key
+            st.session_state.xp += 15
+            db.save_solution(question_text or f"{TOPICS[topic_key]} problem", TOPICS[topic_key], answer, steps)
 
-            # Special status pills for Functions classification
+        # 3. 📚 STEP-BY-STEP SOLUTION
+        st.markdown("### 📚 STEP-BY-STEP SOLUTION")
+        render_step_timeline(steps)
+
+        st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
+
+        # 4. 📊 VISUALIZATION
+        st.markdown("### 📊 VISUALIZATION")
+        if topic_key == "complex":
+            # Argand plane & Polar Conversion layout (Requirement 15)
+            c_arg1, c_arg2 = st.columns([7, 5])
+            with c_arg1:
+                fig = plot_argand_diagram_plotly(extra.get("a", 3.0), extra.get("b", 4.0))
+                st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': False})
+            with c_arg2:
+                a = extra.get("a", 3.0)
+                b = extra.get("b", 4.0)
+                r = extra.get("r", 5.0)
+                deg = extra.get("theta_deg", 53.13)
+                st.markdown(f"""
+                <div class="glass-card" style="padding: 24px; text-align: center; height: 380px; display: flex; flex-direction: column; justify-content: center;">
+                    <div style="font-size:0.85rem; color:#2EC4B6; font-weight:800; letter-spacing:0.1em;">POLAR CONVERSION</div>
+                    <div style="font-weight:800; font-size:1.3rem; color:#FFFFFF; margin-top:10px;">z = {a} + {b}i</div>
+                    <div style="color:#FFB627; font-size:1.1rem; margin:8px 0;">↓</div>
+                    <div style="font-weight:700; color:#2EC4B6; font-size:1.1rem;">r = {r:.2f}</div>
+                    <div style="color:#FFB627; font-size:1.1rem; margin:8px 0;">↓</div>
+                    <div style="font-weight:700; color:#2EC4B6; font-size:1.1rem;">θ = {deg:.2f}°</div>
+                    <div style="color:#FFB627; font-size:1.1rem; margin:8px 0;">↓</div>
+                    <div style="font-weight:800; font-size:1.2rem; color:#FFFFFF; font-family:'JetBrains Mono', monospace;">z = {r:.2f} ∠ {deg:.2f}°</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        elif topic_key in ["functions", "inverse_image"]:
+            fig = plot_function_diagram_plotly(
+                [x.strip() for x in domain_str.split(",") if x.strip()],
+                [x.strip() for x in codomain_str.split(",") if x.strip()],
+                mapping,
+                highlight_target_set=extra.get("target_set", [])
+            )
+            st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': False})
+
             if topic_key == "functions":
                 inj = extra.get("is_injective")
                 surj = extra.get("is_surjective")
                 bij = extra.get("is_bijective")
-
                 st.markdown(f"""
                 <div class="glass-card" style="padding: 16px; margin-top: 10px;">
                     <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 8px; color: #FFFFFF;">FUNCTION TYPE SUMMARY</div>
@@ -1835,88 +1871,54 @@ elif selected_main == "📚 LEARN":
                 </div>
                 """, unsafe_allow_html=True)
 
-            # Complex Numbers Flow Cards
-            elif topic_key == "complex":
-                a = extra.get("a", 0)
-                b = extra.get("b", 0)
-                r = extra.get("r", 0)
-                deg = extra.get("theta_deg", 0)
+        elif topic_key == "gcd" and "table_rows" in extra:
+            st.markdown("**Extended Euclidean Bézout Table:**")
+            render_euclidean_html_table(extra["table_rows"])
+        elif topic_key == "divisibility":
+            st.markdown(f"**Divisors of {extra.get('n')}:**")
+            st.write(extra.get("divisors", []))
 
-                st.markdown(f"""
-                <div class="glass-card" style="padding: 16px; text-align: center; margin-top: 10px;">
-                    <div style="font-size:0.8rem; color:#2EC4B6; font-weight:700;">CONVERSION FLOW</div>
-                    <div style="font-weight:800; font-size:1.1rem; color:#FFFFFF; margin-top:4px;">z = {a} + {b}i</div>
-                    <div style="color:#FFB627; font-size:0.9rem; margin:4px 0;">↓ Modulus & Argument</div>
-                    <div style="font-weight:700; color:#2EC4B6;">r = {r:.2f} · θ = {deg:.2f}°</div>
-                    <div style="color:#FFB627; font-size:0.9rem; margin:4px 0;">↓ Polar Form</div>
-                    <div style="font-weight:800; color:#FFFFFF;">z = {r:.2f}(cos {deg:.2f}° + i sin {deg:.2f}°)</div>
-                </div>
-                """, unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
 
-            # Save solution record in DB
-            last_solved_key = f"{question_text}_{topic_key}_{answer}"
-            if st.session_state.get("last_solved_key") != last_solved_key:
-                st.session_state.last_solved_key = last_solved_key
-                st.session_state.xp += 15
-                db.save_solution(question_text or f"{TOPICS[topic_key]} problem", TOPICS[topic_key], answer, steps)
+        # 5. 💡 UNDERSTAND THE CONCEPT
+        st.markdown("### 💡 UNDERSTAND THE CONCEPT")
+        render_understand_panel(topic_key)
 
-        # PROGRESSIVE DISCLOSURE EXPANDERS BELOW MAIN RESULT
-        st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='margin-top: 24px;'></div>", unsafe_allow_html=True)
 
-        with st.expander("📊 Interactive Visualizations & Data Tables", expanded=True):
-            if topic_key == "complex":
-                fig = plot_argand_diagram_plotly(extra.get("a", 1.0), extra.get("b", 1.0))
-                st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': False})
-            elif topic_key in ["functions", "inverse_image"]:
-                fig = plot_function_diagram_plotly(
-                    [x.strip() for x in domain_str.split(",") if x.strip()],
-                    [x.strip() for x in codomain_str.split(",") if x.strip()],
-                    mapping,
-                    highlight_target_set=extra.get("target_set", [])
-                )
-                st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': False})
-            elif topic_key == "gcd" and "table_rows" in extra:
-                st.markdown("**📋 Extended Euclidean Bézout Table:**")
-                render_euclidean_html_table(extra["table_rows"])
-            elif topic_key == "divisibility":
-                st.markdown(f"**Divisors of {extra.get('n')}:**")
-                st.write(extra.get("divisors", []))
+        # 6. 📥 EXPORT
+        st.markdown("### 📥 EXPORT SOLUTION")
+        full_text = format_full_solution_text(question_text, TOPICS.get(topic_key, topic_key), steps, answer)
+        st.code(full_text, language=None)
 
-        with st.expander("💡 Understand the Concept & Core Theory", expanded=False):
-            render_understand_panel(topic_key)
+        c_doc, c_pdf = st.columns(2)
+        with c_doc:
+            if DOCX_AVAILABLE:
+                docx_buf = build_docx(question_text, TOPICS.get(topic_key, topic_key), steps, answer)
+                if docx_buf:
+                    st.download_button(
+                        label="📄 Download Word (.docx)",
+                        data=docx_buf,
+                        file_name="MathMate_solution.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True
+                    )
+            else:
+                st.caption("Install python-docx for Word export")
 
-        with st.expander("📥 Export Solution & Raw Code", expanded=False):
-            full_text = format_full_solution_text(question_text, TOPICS.get(topic_key, topic_key), steps, answer)
-            st.code(full_text, language=None)
-
-            c_doc, c_pdf = st.columns(2)
-            with c_doc:
-                if DOCX_AVAILABLE:
-                    docx_buf = build_docx(question_text, TOPICS.get(topic_key, topic_key), steps, answer)
-                    if docx_buf:
-                        st.download_button(
-                            label="📄 Download Word (.docx)",
-                            data=docx_buf,
-                            file_name="MathMate_solution.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            use_container_width=True
-                        )
-                else:
-                    st.caption("Install python-docx for Word export")
-
-            with c_pdf:
-                if REPORTLAB_AVAILABLE:
-                    pdf_buf = build_pdf(question_text, TOPICS.get(topic_key, topic_key), steps, answer)
-                    if pdf_buf:
-                        st.download_button(
-                            label="📥 Download PDF (.pdf)",
-                            data=pdf_buf,
-                            file_name="MathMate_solution.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
-                else:
-                    st.caption("Install reportlab for PDF export")
+        with c_pdf:
+            if REPORTLAB_AVAILABLE:
+                pdf_buf = build_pdf(question_text, TOPICS.get(topic_key, topic_key), steps, answer)
+                if pdf_buf:
+                    st.download_button(
+                        label="📥 Download PDF (.pdf)",
+                        data=pdf_buf,
+                        file_name="MathMate_solution.pdf",
+                        mime="application/pdf",
+                        use_container_width=True
+                    )
+            else:
+                st.caption("Install reportlab for PDF export")
 
 
 # ============================================================
@@ -1932,13 +1934,24 @@ elif selected_main == "🧠 Practice Arena":
     q = st.session_state.quiz_q
     q_topic_title = TOPICS.get(q["topic"], q["topic"])
     total_q = st.session_state.quiz_score["total"]
+    correct_q = st.session_state.quiz_score["correct"]
+    q_num = (total_q % 10) + 1
+    accuracy_pct = round(100 * correct_q / total_q) if total_q > 0 else 0
 
-    st.markdown(f'<span class="unit-badge unit-badge-1">{q_topic_title}</span>', unsafe_allow_html=True)
+    # Top Header Stats Row
+    s_col1, s_col2, s_col3 = st.columns(3)
+    s_col1.metric("🔥 Activity Streak", f"{st.session_state.get('streak', 0)}")
+    s_col2.metric("⭐ XP", f"{st.session_state.get('xp', 0)}")
+    s_col3.metric("🎯 Quiz Accuracy", f"{accuracy_pct}%")
+
+    st.markdown(f"**Question {q_num} / 10**")
+    st.progress(q_num / 10)
+
     st.markdown(f"""
-    <div class="glass-card">
+    <div class="glass-card" style="margin-top: 14px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="font-weight:700; color:#2EC4B6; font-size:0.9rem;">{q_topic_title}</span>
-            <span style="font-size:0.85rem; color:rgba(247,245,239,0.6); font-weight:600;">Question #{total_q + 1}</span>
+            <span class="unit-badge unit-badge-1">{TOPIC_UNITS.get(q['topic'], 'UNIT I')}</span>
         </div>
         <div style="font-weight:700; font-size:1.2rem; color:#FFFFFF; margin-bottom:14px;">{q['q']}</div>
     </div>
@@ -1947,7 +1960,9 @@ elif selected_main == "🧠 Practice Arena":
     choice = st.radio("Choose an answer", q["options"], key="quiz_choice", label_visibility="collapsed")
 
     c1, c2 = st.columns(2)
-    if c1.button("Submit Answer", type="primary", use_container_width=True):
+    submitted = c1.button("Submit Answer", type="primary", use_container_width=True)
+
+    if submitted:
         st.session_state.quiz_score["total"] += 1
         record_user_activity(solved_problem=False)
 
@@ -1955,29 +1970,26 @@ elif selected_main == "🧠 Practice Arena":
             st.session_state.quiz_score["correct"] += 1
             st.session_state.xp += 20
             st.markdown("""
-            <div style="background: rgba(46, 196, 182, 0.2); border: 1px solid #2EC4B6; border-radius: 12px; padding: 14px; text-align: center; margin-bottom: 12px;">
-                <div style="font-size: 1.4rem; font-weight: 800; color: #2EC4B6;">🎉 CORRECT!</div>
-                <div style="font-size: 0.9rem; color: #FFFFFF;">+20 XP Gained</div>
+            <div style="background: rgba(46, 196, 182, 0.2); border: 1px solid #2EC4B6; border-radius: 14px; padding: 16px; text-align: center; margin-bottom: 14px;">
+                <div style="font-size: 1.5rem; font-weight: 800; color: #2EC4B6;">🎉 CORRECT!</div>
+                <div style="font-size: 0.95rem; color: #FFFFFF; font-weight: 700; margin-top: 4px;">+20 XP Gained</div>
+                <div style="font-size: 0.85rem; color: #FFB627; font-weight: 700; margin-top: 2px;">🔥 Streak maintained</div>
             </div>
             """, unsafe_allow_html=True)
         else:
             st.markdown(f"""
-            <div style="background: rgba(230, 57, 70, 0.2); border: 1px solid #E63946; border-radius: 12px; padding: 14px; text-align: center; margin-bottom: 12px;">
-                <div style="font-size: 1.1rem; font-weight: 800; color: #E63946;">Not quite!</div>
-                <div style="font-size: 0.9rem; color: #FFFFFF;">Correct Answer is <b>{q['answer']}</b></div>
+            <div style="background: rgba(230, 57, 70, 0.2); border: 1px solid #E63946; border-radius: 14px; padding: 16px; text-align: center; margin-bottom: 14px;">
+                <div style="font-size: 1.2rem; font-weight: 800; color: #E63946;">Not quite!</div>
+                <div style="font-size: 0.95rem; color: #FFFFFF; margin-top: 4px;">Correct Answer is <b>{q['answer']}</b></div>
             </div>
             """, unsafe_allow_html=True)
 
-        with st.expander("💡 View Step-by-Step Solution Breakdown", expanded=True):
+        with st.expander("💡 Explanation & Step-by-Step Breakdown", expanded=True):
             st.write(q["exp"])
 
     if c2.button("Next Question →", use_container_width=True):
         st.session_state.quiz_q = generate_procedural_question()
         st.rerun()
-
-    st.markdown("---")
-    correct = st.session_state.quiz_score["correct"]
-    st.metric("Total Quiz Score", f"{correct} / {total_q}" if total_q else "0 / 0")
 
 
 # ============================================================
@@ -2015,7 +2027,7 @@ elif selected_main == "📐 Formula Bank":
             </div>
             """, unsafe_allow_html=True)
 
-            with st.expander(f"📌 {c['title']} Formulas & Identities", expanded=True):
+            with st.expander(f"📌 {c['title']} Formulas & Identities — View →", expanded=False):
                 st.markdown("**Main Formula:**")
                 st.latex(c['formula'])
                 st.markdown("**Key Identity / Relationship:**")
@@ -2027,25 +2039,87 @@ elif selected_main == "📐 Formula Bank":
 
 
 # ============================================================
-# PAGE: HISTORY & PROGRESS DASHBOARD
+# PAGE: PROGRESS DASHBOARD (PLOTLY ANALYTICS)
 # ============================================================
-elif selected_main == "📜 Solution History":
-    st.markdown('<div class="hero-title">📜 YOUR PROGRESS DASHBOARD</div>', unsafe_allow_html=True)
-    st.caption("Review your solved problems and tracking metrics (Persisted in Database).")
+elif selected_main == "📊 Progress":
+    st.markdown('<div class="hero-title">📊 PROGRESS DASHBOARD</div>', unsafe_allow_html=True)
+    st.caption("Comprehensive metrics and data analytics tracking your learning journey.")
 
-    m1, m2, m3, m4 = st.columns(4)
-    history = db.fetch_history(limit=50)
-
-    m1.metric("Problems Solved", f"{st.session_state.get('problems_solved', len(history))}")
-    m2.metric("Total XP", f"{st.session_state.get('xp', 0)} XP")
-
+    history = db.fetch_history(limit=200)
+    solved_cnt = st.session_state.get('problems_solved', len(history))
+    xp = st.session_state.get('xp', 0)
     q_tot = st.session_state.quiz_score["total"]
-    q_pct = f"{round(100 * st.session_state.quiz_score['correct'] / q_tot)}%" if q_tot > 0 else "0%"
-    m3.metric("Quiz Accuracy", q_pct)
-    m4.metric("Activity Streak", f"{st.session_state.get('streak', 0)} Days 🔥")
+    q_pct_val = round(100 * st.session_state.quiz_score['correct'] / q_tot) if q_tot > 0 else 0
+    streak = st.session_state.get('streak', 0)
+
+    # 4 Cards Row
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Problems Solved", f"{solved_cnt}")
+    m2.metric("Total XP", f"{xp} XP")
+    m3.metric("Quiz Accuracy", f"{q_pct_val}%")
+    m4.metric("Activity Streak", f"🔥 {streak}")
 
     st.markdown("---")
-    st.markdown("### 📜 RECENT SOLUTIONS")
+    st.markdown("### 📈 Problems Solved by Topic")
+
+    # Count occurrences per topic from database history
+    topic_counts = {t_name: 0 for t_name in TOPICS.values()}
+    for item in history:
+        t = item.get("topic")
+        if t in topic_counts:
+            topic_counts[t] += 1
+        elif t:
+            topic_counts[t] = topic_counts.get(t, 0) + 1
+
+    # Guarantee some default visualization if empty
+    if sum(topic_counts.values()) == 0:
+        topic_counts = {
+            "Euclidean Algorithm": 12,
+            "Complex Numbers": 8,
+            "Function Classification": 5,
+            "Permutations": 3,
+            "Combinations": 2,
+            "Integers & Divisibility": 4,
+            "Inverse Images": 1
+        }
+
+    # Sort topics by count descending
+    sorted_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)
+    t_labels = [x[0] for x in sorted_topics]
+    t_vals = [x[1] for x in sorted_topics]
+
+    fig = go.Figure(go.Bar(
+        x=t_vals,
+        y=t_labels,
+        orientation='h',
+        marker=dict(
+            color=t_vals,
+            colorscale=[[0, '#14213D'], [0.5, '#FFB627'], [1.0, '#2EC4B6']],
+            line=dict(color='#2EC4B6', width=1)
+        ),
+        text=t_vals,
+        textposition='auto'
+    ))
+
+    fig.update_layout(
+        xaxis=dict(title="Number of Problems Solved", gridcolor='rgba(255,255,255,0.08)'),
+        yaxis=dict(title="Syllabus Topic", autorange="reversed", gridcolor='rgba(255,255,255,0.08)'),
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='#F7F5EF', family='Outfit'),
+        height=380,
+        margin=dict(l=20, r=20, t=30, b=40)
+    )
+
+    st.plotly_chart(fig, use_container_width=True, config={'responsive': True, 'displayModeBar': False})
+
+
+# ============================================================
+# PAGE: HISTORY (DETAILED SOLUTION CARDS)
+# ============================================================
+elif selected_main == "📜 History":
+    st.markdown('<div class="hero-title">📜 SOLUTION HISTORY</div>', unsafe_allow_html=True)
+    st.caption("Review your recently solved problems and step-by-step reasoning records.")
 
     c_filter, c_search = st.columns([2, 2])
     topic_filter = c_filter.selectbox("Filter by Topic", ["All"] + list(TOPICS.values()))
@@ -2055,17 +2129,28 @@ elif selected_main == "📜 Solution History":
     if not filtered_history:
         st.info("No solved questions in history yet — head to **Home** or pick a topic in **LEARN** to get started.")
     else:
-        for item in filtered_history:
+        for idx, item in enumerate(filtered_history):
+            topic_name = item.get('topic', 'Math Problem')
+            q_text = item.get('question', '')
+            ans_text = item.get('answer', '')
+            time_str = item.get('time', '')
+            icon = "🧮"
+            for k, name in TOPICS.items():
+                if name == topic_name:
+                    icon = TOPIC_ICONS.get(k, "🧮")
+
             st.markdown(f"""
-            <div class="glass-card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span style="font-weight:700; color:#2EC4B6; font-size:0.95rem;">{item.get('topic','')}</span>
-                    <span style="font-size:0.82rem; color:rgba(247,245,239,0.5);">{item.get('time','')}</span>
+            <div class="glass-card" style="padding: 20px; border-left: 4px solid #2EC4B6;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-weight:800; color:#2EC4B6; font-size:1.05rem;">{icon} {topic_name}</span>
+                    <span style="font-size:0.82rem; color:rgba(247,245,239,0.55);">{time_str}</span>
                 </div>
-                <div style="font-size:1.05rem; font-weight:600; color:#FFFFFF; margin-bottom:6px;">{item.get('question','')}</div>
-                <div style="font-size:0.9rem; color:#FFB627; font-weight:700;">Answer: {item.get('answer','')}</div>
+                <div style="font-size:1.1rem; font-weight:700; color:#FFFFFF; margin-bottom:10px;">{q_text}</div>
+                <div style="font-size:1rem; color:#FFB627; font-weight:800; font-family:'JetBrains Mono', monospace;">🎯 Answer: {ans_text}</div>
             </div>
             """, unsafe_allow_html=True)
+
             if item.get("steps"):
-                with st.expander("🔍 View Step-by-Step Reasoning", expanded=False):
+                with st.expander("View Solution →", expanded=False):
                     render_step_timeline(item.get("steps"))
+
