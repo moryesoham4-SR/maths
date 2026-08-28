@@ -265,7 +265,7 @@ st.markdown(f"""
         white-space: pre-wrap;
     }}
     
-    .answer-card {
+    .answer-card {{
         background: linear-gradient(135deg, rgba(46, 196, 182, 0.22) 0%, rgba(20, 33, 61, 0.6) 100%);
         border: 2px solid #2EC4B6;
         border-radius: 20px;
@@ -273,24 +273,24 @@ st.markdown(f"""
         text-align: center;
         margin-bottom: 20px;
         box-shadow: 0 12px 35px rgba(46, 196, 182, 0.28);
-    }
+    }}
     
-    .answer-badge {
+    .answer-badge {{
         font-size: 0.95rem;
         font-weight: 800;
         letter-spacing: 0.14em;
         color: #2EC4B6;
         text-transform: uppercase;
         margin-bottom: 12px;
-    }
+    }}
     
-    .answer-value {
+    .answer-value {{
         font-size: 2.3rem;
         font-weight: 800;
         color: #FFFFFF;
         font-family: 'JetBrains Mono', monospace;
         letter-spacing: -0.01em;
-    }
+    }}
     
     .understand-card {{
         background: rgba(255, 182, 39, 0.06);
