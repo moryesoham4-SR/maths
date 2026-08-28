@@ -1625,9 +1625,7 @@ if selected_main == "🏠 Home":
             st.button(f"Explore {TOPICS.get(key, key)} →", key=f"btn_qs_{key}", use_container_width=True, on_click=set_nav, args=("📚 Learn", key, sample_qs[key]))
 
     st.markdown("<div style='margin-top: 24px; text-align: center;'>", unsafe_allow_html=True)
-    if st.button("📚 View All Topics →", type="secondary", use_container_width=True):
-        st.session_state.main_nav = "📚 Learn"
-        st.rerun()
+    st.button("📚 View All Topics →", type="secondary", use_container_width=True, on_click=set_nav, args=("📚 Learn",))
     st.markdown("</div>", unsafe_allow_html=True)
 
 
