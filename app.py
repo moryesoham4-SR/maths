@@ -30,6 +30,10 @@ import random
 import json
 from datetime import datetime, timedelta
 
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 import streamlit as st
 
 # ============================================================
@@ -1069,7 +1073,8 @@ def solve_functions(domain: list, codomain: list, mapping: dict):
     return steps, ans_str, {
         "is_injective": is_injective, "is_surjective": is_surjective,
         "is_bijective": is_bijective, "range_set": list(range_set),
-        "unmapped": list(codomain_set - range_set), "latex_ans": ans_latex
+        "unmapped": list(codomain_set - range_set), "latex_ans": ans_latex,
+        "domain": domain, "codomain": codomain, "mapping": mapping
     }
 
 
@@ -1096,7 +1101,8 @@ def solve_inverse_image(domain: list, codomain: list, mapping: dict, target_set:
     return steps, ans_str, {
         "target_set": target_set_clean,
         "inverse_image": inv_image,
-        "latex_ans": ans_latex
+        "latex_ans": ans_latex,
+        "domain": domain, "codomain": codomain, "mapping": mapping
     }
 
 
@@ -1264,6 +1270,100 @@ def plot_argand_diagram_plotly(a: float, b: float):
     return fig
 
 
+def generate_mapping_diagram_image(domain: list, codomain: list, mapping: dict, highlight_target_set: list = None) -> io.BytesIO:
+    """Generate a high-resolution PNG image of the bipartite function mapping diagram."""
+    if not domain or not codomain:
+        return None
+    try:
+        fig, ax = plt.subplots(figsize=(6, 3.5), dpi=200)
+        fig.patch.set_facecolor('#0A1226')
+        ax.set_facecolor('#0A1226')
+
+        d_y = list(range(len(domain), 0, -1))
+        c_y = list(range(len(codomain), 0, -1))
+
+        domain_pos = {str(d): (0, y) for d, y in zip(domain, d_y)}
+        codomain_pos = {str(c): (1, y) for c, y in zip(codomain, c_y)}
+
+        for d, c in mapping.items():
+            sd, sc = str(d), str(c)
+            if sd in domain_pos and sc in codomain_pos:
+                x0, y0 = domain_pos[sd]
+                x1, y1 = codomain_pos[sc]
+                is_hl = highlight_target_set and sc in [str(x) for x in highlight_target_set]
+                line_color = '#FFB627' if is_hl else '#2EC4B6'
+                ax.annotate('', xy=(x1 - 0.08, y1), xytext=(x0 + 0.08, y0),
+                            arrowprops=dict(arrowstyle="-|>", color=line_color, lw=2.5 if is_hl else 1.8, mutation_scale=15))
+
+        for d, (x, y) in domain_pos.items():
+            ax.scatter(x, y, s=500, color='#14213D', edgecolors='#2EC4B6', linewidths=2, zorder=3)
+            ax.text(x - 0.15, y, d, color='#FFFFFF', fontsize=11, fontweight='bold', ha='right', va='center')
+
+        for c, (x, y) in codomain_pos.items():
+            is_hl = highlight_target_set and c in [str(x) for x in highlight_target_set]
+            node_color = '#FFB627' if is_hl else '#2EC4B6'
+            ax.scatter(x, y, s=500, color='#14213D', edgecolors=node_color, linewidths=2.5 if is_hl else 2, zorder=3)
+            ax.text(x + 0.15, y, c, color='#FFFFFF', fontsize=11, fontweight='bold', ha='left', va='center')
+
+        max_y = max(len(domain), len(codomain)) + 0.6
+        ax.text(0, max_y, "Domain A", color='#2EC4B6', fontsize=12, fontweight='bold', ha='center')
+        ax.text(1, max_y, "Codomain B", color='#FFB627', fontsize=12, fontweight='bold', ha='center')
+
+        ax.set_xlim(-0.5, 1.5)
+        ax.set_ylim(0, max_y + 0.5)
+        ax.axis('off')
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
+        plt.close(fig)
+        buf.seek(0)
+        return buf
+    except Exception:
+        return None
+
+
+def generate_argand_diagram_image(a: float, b: float) -> io.BytesIO:
+    """Generate a high-resolution PNG image of the Argand plane diagram."""
+    try:
+        r = math.hypot(a, b)
+        theta_deg = math.degrees(math.atan2(b, a))
+        max_val = max(abs(a), abs(b), 1.0) * 1.3
+
+        fig, ax = plt.subplots(figsize=(5, 4.5), dpi=200)
+        fig.patch.set_facecolor('#0A1226')
+        ax.set_facecolor('#0A1226')
+
+        ax.axhline(0, color='rgba(255,255,255,0.3)', lw=1)
+        ax.axvline(0, color='rgba(255,255,255,0.3)', lw=1)
+
+        ax.annotate('', xy=(a, b), xytext=(0, 0),
+                    arrowprops=dict(arrowstyle="-|>", color='#2EC4B6', lw=2.5, mutation_scale=15))
+        ax.scatter([a], [b], color='#2EC4B6', s=60, zorder=4)
+
+        ax.plot([a, a], [0, b], color='#FFB627', linestyle='--', lw=1.5)
+        ax.plot([0, a], [b, b], color='#FFB627', linestyle='--', lw=1.5)
+
+        ax.text(a * 1.05, b * 1.05, f"z = {a} + {b}i\n(r={r:.2f}, θ={theta_deg:.1f}°)", color='#FFFFFF', fontsize=10, fontweight='bold')
+
+        ax.set_xlim(-max_val, max_val)
+        ax.set_ylim(-max_val, max_val)
+        ax.set_xlabel("Real Axis (Re)", color='#2EC4B6', fontweight='bold')
+        ax.set_ylabel("Imaginary Axis (Im)", color='#2EC4B6', fontweight='bold')
+        ax.tick_params(colors='#FFFFFF')
+        for spine in ax.spines.values():
+            spine.set_color('rgba(255,255,255,0.2)')
+        plt.tight_layout()
+
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
+        plt.close(fig)
+        buf.seek(0)
+        return buf
+    except Exception:
+        return None
+
+
 # ============================================================
 # UI RENDER COMPONENTS
 # ============================================================
@@ -1386,13 +1486,20 @@ def format_full_solution_text(question_text: str, topic_name: str, steps: list, 
     return "\n".join(lines)
 
 
-def build_docx(question_text: str, topic_name: str, steps: list, answer: str):
+def build_docx(question_text: str, topic_name: str, steps: list, answer: str, img_buf=None):
     if not DOCX_AVAILABLE:
         return None
+    from docx.shared import Inches
     doc = Document()
     doc.add_heading("MathMate — Interactive Mathematics Lab", level=0)
     doc.add_heading(f"Topic: {topic_name}", level=2)
     doc.add_paragraph(f"Question Statement:\n{question_text}")
+
+    if img_buf:
+        doc.add_heading("Visualization / Diagram:", level=2)
+        doc.add_picture(img_buf, width=Inches(4.5))
+        img_buf.seek(0)
+
     doc.add_heading("Step-by-Step Reasoning:", level=2)
     if steps:
         for i, step in enumerate(steps, 1):
@@ -1409,9 +1516,10 @@ def build_docx(question_text: str, topic_name: str, steps: list, answer: str):
     return buf
 
 
-def build_pdf(question_text: str, topic_name: str, steps: list, answer: str):
+def build_pdf(question_text: str, topic_name: str, steps: list, answer: str, img_buf=None):
     if not REPORTLAB_AVAILABLE:
         return None
+    from reportlab.platypus import Image as RLImage
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
     styles = getSampleStyleSheet()
@@ -1427,6 +1535,13 @@ def build_pdf(question_text: str, topic_name: str, steps: list, answer: str):
     display_q = re.sub(r'<[^>]+>', '', str(question_text)).strip() if question_text else f"{topic_name} Practical Question"
     story.append(Paragraph(f"<b>Question Statement:</b><br/>{display_q}", body_style))
     story.append(Spacer(1, 12))
+
+    if img_buf:
+        story.append(Paragraph("<b>Visualization / Diagram:</b>", subtitle_style))
+        story.append(Spacer(1, 6))
+        story.append(RLImage(img_buf, width=320, height=200))
+        story.append(Spacer(1, 12))
+        img_buf.seek(0)
 
     story.append(Paragraph("<b>Step-by-Step Reasoning:</b>", subtitle_style))
     story.append(Spacer(1, 8))
@@ -1889,10 +2004,24 @@ elif selected_main == "📚 Learn":
         full_text = format_full_solution_text(question_text, TOPICS.get(topic_key, topic_key), steps, answer)
         st.code(full_text, language=None)
 
+        img_buf = None
+        if topic_key in ["functions", "inverse_image"]:
+            img_buf = generate_mapping_diagram_image(
+                extra.get("domain", ["1", "2", "3", "4"]),
+                extra.get("codomain", ["a", "b", "c"]),
+                extra.get("mapping", {}),
+                highlight_target_set=extra.get("target_set")
+            )
+        elif topic_key == "complex":
+            img_buf = generate_argand_diagram_image(
+                extra.get("a", 3.0),
+                extra.get("b", 4.0)
+            )
+
         c_doc, c_pdf = st.columns(2)
         with c_doc:
             if DOCX_AVAILABLE:
-                docx_buf = build_docx(question_text, TOPICS.get(topic_key, topic_key), steps, answer)
+                docx_buf = build_docx(question_text, TOPICS.get(topic_key, topic_key), steps, answer, img_buf=img_buf)
                 if docx_buf:
                     st.download_button(
                         label="📄 Download Word (.docx)",
@@ -1906,7 +2035,7 @@ elif selected_main == "📚 Learn":
 
         with c_pdf:
             if REPORTLAB_AVAILABLE:
-                pdf_buf = build_pdf(question_text, TOPICS.get(topic_key, topic_key), steps, answer)
+                pdf_buf = build_pdf(question_text, TOPICS.get(topic_key, topic_key), steps, answer, img_buf=img_buf)
                 if pdf_buf:
                     st.download_button(
                         label="📥 Download PDF (.pdf)",
