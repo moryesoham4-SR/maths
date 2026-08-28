@@ -1205,7 +1205,7 @@ def plot_function_diagram_plotly(domain: list, codomain: list, mapping: dict, hi
         x=[0] * len(domain), y=d_y,
         mode='markers+text',
         marker=dict(size=28, color='#14213D', line=dict(color='#2EC4B6', width=2)),
-        text=domain, textposition="left center",
+        text=domain, textposition="middle left",
         textfont=dict(color='#FFFFFF', size=14, family='Outfit'),
         name="Domain A", showlegend=False
     ))
@@ -1214,7 +1214,7 @@ def plot_function_diagram_plotly(domain: list, codomain: list, mapping: dict, hi
         x=[1] * len(codomain), y=c_y,
         mode='markers+text',
         marker=dict(size=28, color='#14213D', line=dict(color='#FFB627', width=2)),
-        text=codomain, textposition="right center",
+        text=codomain, textposition="middle right",
         textfont=dict(color='#FFFFFF', size=14, family='Outfit'),
         name="Codomain B", showlegend=False
     ))
