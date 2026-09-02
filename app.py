@@ -838,40 +838,38 @@ def compute_extended_euclidean_table(a: int, b: int):
     y0, y1 = 0, 1
 
     rows.append({
-        "Step (i)": 0, "Dividend": a_orig, "Divisor": b_orig,
+        "Step (i)": 0, "Dividend": "—", "Divisor": "—",
         "Quotient (q)": "—", "Remainder (r)": r0,
         "x": x0, "y": y0, "is_gcd": False
     })
     rows.append({
-        "Step (i)": 1, "Dividend": a_orig, "Divisor": b_orig,
+        "Step (i)": 1, "Dividend": "—", "Divisor": "—",
         "Quotient (q)": "—", "Remainder (r)": r1,
         "x": x1, "y": y1, "is_gcd": False
     })
 
     step_i = 2
-    last_gcd_idx = -1
     while r1 != 0:
         q = r0 // r1
         r2 = r0 % r1
         x2 = x0 - q * x1
         y2 = y0 - q * y1
 
-        is_last_nonzero = (r2 == 0)
         rows.append({
             "Step (i)": step_i, "Dividend": r0, "Divisor": r1,
             "Quotient (q)": q, "Remainder (r)": r2,
             "x": x2, "y": y2, "is_gcd": False
         })
-        if is_last_nonzero:
-            last_gcd_idx = len(rows) - 2
 
         r0, r1 = r1, r2
         x0, x1 = x1, x2
         y0, y1 = y1, y2
         step_i += 1
 
-    if last_gcd_idx >= 0:
-        rows[last_gcd_idx]["is_gcd"] = True
+    for r in reversed(rows):
+        if r["Remainder (r)"] != 0:
+            r["is_gcd"] = True
+            break
 
     return rows
 
